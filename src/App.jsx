@@ -3,6 +3,9 @@ import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import DealModule from './DealModule';
 import StorageModule from './StorageModule';
+import ApplicationModule from './ApplicationModule';
+import CustomPage from './CustomPage';
+import AcceptancePage from './AcceptancePage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PlaceholderPage = ({ title }) => (
@@ -34,7 +37,7 @@ function App() {
       case 'dashboard':
         return <Dashboard key="dashboard" />;
       case 'application':
-        return <PlaceholderPage key="application" title="Application" />;
+        return <ApplicationModule key="application" />;
       case 'deal':
         return <DealModule key="deal" />;
       case 'storage':
