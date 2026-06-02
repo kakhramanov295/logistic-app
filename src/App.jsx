@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
+import CustomPage from './CustomPage';
+import AcceptancePage from './AcceptancePage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PlaceholderPage = ({ title }) => (
@@ -38,9 +40,9 @@ function App() {
       case 'storage':
         return <PlaceholderPage key="storage" title="Storage" />;
       case 'custom':
-        return <PlaceholderPage key="custom" title="Custom" />;
+        return <CustomPage key="custom" />;
       case 'acceptance':
-        return <PlaceholderPage key="acceptance" title="Acceptance" />;
+        return <AcceptancePage key="acceptance" />;
       default:
         return <Dashboard key="dashboard" />;
     }

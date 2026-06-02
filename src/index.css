@@ -26,7 +26,7 @@ body {
 
 .app-container {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   width: 100vw;
   overflow: hidden;
 }
@@ -95,7 +95,10 @@ body {
 /* Main Content Styles */
 .main-content {
   flex: 1;
+  min-width: 0;
+  height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 40px;
   background-color: var(--bg-dark);
 }
@@ -292,6 +295,7 @@ th, td {
   padding: 16px;
   text-align: left;
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 
 th {
