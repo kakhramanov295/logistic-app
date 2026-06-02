@@ -8,6 +8,55 @@ import CustomPage from './CustomPage';
 import AcceptancePage from './AcceptancePage';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const INITIAL_WAREHOUSES = [
+  { id: 'WH-001', name: 'Tashkent Central Hub', type: 'General Cold Storage', location: 'Tashkent, UZ', capacity: 50000, occupiedSpace: 12000, availableSpace: 38000, manager: 'Dilshod Karimov', status: 'Active', createdDate: '2025-01-10' },
+  { id: 'WH-002', name: 'Samarkand Logistics Center', type: 'Dry Storage', location: 'Samarkand, UZ', capacity: 30000, occupiedSpace: 30000, availableSpace: 0, manager: 'Sardor Alimov', status: 'Full', createdDate: '2025-03-15' },
+  { id: 'WH-003', name: 'Fergana Valley Depot', type: 'Distribution Center', location: 'Fergana, UZ', capacity: 20000, occupiedSpace: 5000, availableSpace: 15000, manager: 'Malika Sobirova', status: 'Maintenance', createdDate: '2025-05-20' }
+];
+
+const INITIAL_DEALS = [
+  {
+    id: 'DEAL-001',
+    title: 'Krasovka (Sneakers) Order',
+    customerName: 'Obod Trade LLC',
+    customerPhone: '+998-90-123-4567',
+    pickupLocation: 'Tashkent, UZ',
+    deliveryLocation: 'Samarkand, UZ',
+    cargoType: 'Krasovka (Sneakers)',
+    orderedQuantity: 200,
+    shippedQuantity: 450,
+    vehicleType: 'Semi-Truck',
+    driverName: 'John Doe',
+    truckNumber: '01 777 AAA',
+    price: 3500,
+    pickupDate: '2026-06-05',
+    deliveryDate: '2026-06-10',
+    status: 'In Transit',
+    assignedWarehouseId: 'WH-001',
+    notes: 'Fragile cargo. Shipped 450 units, 200 ordered, surplus 250 units must go to Tashkent Central Hub storage.'
+  },
+  {
+    id: 'DEAL-002',
+    title: 'Office Furniture Delivery',
+    customerName: 'Global Corp',
+    customerPhone: '+1-555-0142',
+    pickupLocation: 'Chicago, IL',
+    deliveryLocation: 'Houston, TX',
+    cargoType: 'Furniture',
+    orderedQuantity: 100,
+    shippedQuantity: 100,
+    vehicleType: 'Flatbed',
+    driverName: 'Robert Smith',
+    truckNumber: 'IL-456-CD',
+    price: 2800,
+    pickupDate: '2026-06-03',
+    deliveryDate: '2026-06-07',
+    status: 'Pending',
+    assignedWarehouseId: 'WH-002',
+    notes: 'Deliver to building B, loading dock 4.'
+  }
+];
+
 const PlaceholderPage = ({ title }) => (
   <motion.div 
     initial={{ opacity: 0, scale: 0.95 }}
@@ -31,6 +80,8 @@ const PlaceholderPage = ({ title }) => (
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [deals, setDeals] = useState(INITIAL_DEALS);
+  const [warehouses, setWarehouses] = useState(INITIAL_WAREHOUSES);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -39,9 +90,9 @@ function App() {
       case 'application':
         return <ApplicationModule key="application" />;
       case 'deal':
-        return <DealModule key="deal" />;
+        return <DealModule key="deal" deals={deals} setDeals={setDeals} warehouses={warehouses} />;
       case 'storage':
-        return <StorageModule key="storage" />;
+        return <StorageModule key="storage" warehouses={warehouses} setWarehouses={setWarehouses} deals={deals} />;
       case 'custom':
         return <CustomPage key="custom" />;
       case 'acceptance':
