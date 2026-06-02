@@ -40,9 +40,9 @@ function App() {
       case 'storage':
         return <StorageModule key="storage" />;
       case 'custom':
-        return <PlaceholderPage key="custom" title="Custom" />;
+        return <CustomPage key="custom" />;
       case 'acceptance':
-        return <PlaceholderPage key="acceptance" title="Acceptance" />;
+        return <AcceptancePage key="acceptance" />;
       default:
         return <Dashboard key="dashboard" />;
     }
