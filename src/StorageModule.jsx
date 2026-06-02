@@ -6,60 +6,7 @@ import {
   XCircle, Warehouse, AlertTriangle, Layers, Trash2, Edit2, Loader2, Info, Download
 } from 'lucide-react';
 
-const mockStorage = [
-  {
-    id: 'WH-001',
-    name: 'Seattle Hub Logistics',
-    location: 'Seattle, WA',
-    capacity: 50000,
-    availableSpace: 12000,
-    occupiedSpace: 38000,
-    type: 'General',
-    manager: 'Alice Johnson',
-    contact: '+1 206-555-0192',
-    status: 'Active',
-    createdDate: '2025-11-12',
-  },
-  {
-    id: 'WH-002',
-    name: 'Texas Cold Storage',
-    location: 'Austin, TX',
-    capacity: 25000,
-    availableSpace: 0,
-    occupiedSpace: 25000,
-    type: 'Cold Storage',
-    manager: 'Bob Smith',
-    contact: '+1 512-555-8843',
-    status: 'Full',
-    createdDate: '2025-08-22',
-  },
-  {
-    id: 'WH-003',
-    name: 'Chicago Transit Hub',
-    location: 'Chicago, IL',
-    capacity: 100000,
-    availableSpace: 45000,
-    occupiedSpace: 55000,
-    type: 'Distribution Center',
-    manager: 'Carol White',
-    contact: '+1 312-555-1029',
-    status: 'Maintenance',
-    createdDate: '2026-01-05',
-  },
-  {
-    id: 'WH-004',
-    name: 'Miami Export Facility',
-    location: 'Miami, FL',
-    capacity: 40000,
-    availableSpace: 40000,
-    occupiedSpace: 0,
-    type: 'Bonded Warehouse',
-    manager: 'David Brown',
-    contact: '+1 305-555-7741',
-    status: 'Inactive',
-    createdDate: '2026-04-10',
-  }
-];
+const mockStorage = [];
 
 const StatusBadge = ({ status }) => {
   return (
@@ -228,20 +175,6 @@ const StorageModule = () => {
         <div>
           <h1 className="page-title">Storage Management</h1>
           <p className="page-subtitle">Overview and control of your warehouse network</p>
-        </div>
-        <div className="header-actions">
-          <button className="btn" onClick={handleExport}>
-            <Download size={18} />
-            Export
-          </button>
-          <button className="btn btn-primary" onClick={() => { 
-            setEditingWH(null); 
-            setSelectedFormStatus('Active');
-            setIsFormOpen(true); 
-          }}>
-            <Plus size={18} />
-            Create Storage
-          </button>
         </div>
       </div>
 
