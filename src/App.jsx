@@ -3,9 +3,6 @@ import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import DealModule from './DealModule';
 import StorageModule from './StorageModule';
-import ApplicationModule from './ApplicationModule';
-import CustomPage from './CustomPage';
-import AcceptancePage from './AcceptancePage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const INITIAL_WAREHOUSES = [
@@ -91,32 +88,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [deals, setDeals] = useState(INITIAL_DEALS);
   const [warehouses, setWarehouses] = useState(INITIAL_WAREHOUSES);
-  const [declarations, setDeclarations] = useState(INITIAL_DECLARATIONS);
-
-  const handleDispatchCargo = (cargoData) => {
-    const newId = `CD-2024-${String(declarations.length + 1).padStart(3, '0')}`;
-    const newDecl = {
-      id: newId,
-      shipper: cargoData.shipper || 'Tashkent Central Hub',
-      consignee: cargoData.consignee || 'Global Trade Inc',
-      origin: cargoData.origin || 'Tashkent, UZ',
-      port: cargoData.port || 'LA Port',
-      mode: cargoData.mode || 'sea',
-      value: cargoData.value || '$25,000',
-      hs: cargoData.hs || '8708.29',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      status: 'waiting',
-      documents: [
-        { name: 'Bill of Lading', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-        { name: 'Commercial Invoice', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-        { name: 'Packing List', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }
-      ],
-      spendings: cargoData.spendings || '$1,200',
-      spendingBreakdown: cargoData.spendingBreakdown || 'Customs Duty ($900) + Service Fee ($300)',
-      paymentStatus: 'unpaid'
-    };
-    setDeclarations(prev => [newDecl, ...prev]);
-  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -127,7 +98,7 @@ function App() {
       case 'deal':
         return <DealModule key="deal" deals={deals} setDeals={setDeals} warehouses={warehouses} />;
       case 'storage':
-        return <StorageModule key="storage" warehouses={warehouses} setWarehouses={setWarehouses} deals={deals} onDispatchCargo={handleDispatchCargo} />;
+        return <StorageModule key="storage" warehouses={warehouses} setWarehouses={setWarehouses} deals={deals} />;
       case 'custom':
         return <CustomPage key="custom" declarations={declarations} setDeclarations={setDeclarations} />;
       case 'acceptance':

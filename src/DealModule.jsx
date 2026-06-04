@@ -1,628 +1,702 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Plus, Filter, MoreVertical, 
-  MapPin, Calendar, Truck, User, DollarSign,
-  CheckCircle2, Clock, XCircle, FileText, ArrowRight, TrendingUp, Handshake, Box, Loader2, Trash2, Edit2, Download
+import {
+  Search, Plus, Eye, Edit2, Trash2, X, FileText,
+  Phone, MapPin, Calendar, DollarSign, Briefcase, Archive, AlertTriangle, Truck
 } from 'lucide-react';
 
-const mockDeals = [
-  {
-    id: 'DL-8492',
-    title: 'Electronics to Seattle Hub',
-    customerName: 'TechCorp Industries',
-    pickupLocation: 'San Jose, CA',
-    deliveryLocation: 'Seattle, WA',
-    cargoType: 'Electronics',
-    cargoWeight: '12,500 lbs',
-    vehicleType: 'Dry Van - 53ft',
-    price: 3450.00,
-    driverInfo: 'Mike Johnson',
-    pickupDate: '2026-06-01',
-    deliveryDate: '2026-06-03',
-    status: 'In Progress',
-    notes: 'Fragile. Needs careful handling.',
-  },
-  {
-    id: 'DL-8493',
-    title: 'Frozen Goods to Texas',
-    customerName: 'FreshFoods Co',
-    pickupLocation: 'Chicago, IL',
-    deliveryLocation: 'Austin, TX',
-    cargoType: 'Frozen Food',
-    cargoWeight: '38,000 lbs',
-    vehicleType: 'Reefer',
-    price: 4200.00,
-    driverInfo: 'Sarah Connor',
-    pickupDate: '2026-06-02',
-    deliveryDate: '2026-06-05',
-    status: 'New',
-    notes: 'Maintain -10F throughout transit.',
-  },
-  {
-    id: 'DL-8494',
-    title: 'Steel Beams Delivery',
-    customerName: 'BuildRight Construction',
-    pickupLocation: 'Pittsburgh, PA',
-    deliveryLocation: 'New York, NY',
-    cargoType: 'Building Materials',
-    cargoWeight: '45,000 lbs',
-    vehicleType: 'Flatbed',
-    price: 2800.00,
-    driverInfo: 'David Smith',
-    pickupDate: '2026-05-28',
-    deliveryDate: '2026-05-29',
-    status: 'Completed',
-    notes: 'Deliver to active construction site.',
-  },
-  {
-    id: 'DL-8495',
-    title: 'Auto Parts to Assembly',
-    customerName: 'MotorWorks Inc',
-    pickupLocation: 'Detroit, MI',
-    deliveryLocation: 'Atlanta, GA',
-    cargoType: 'Auto Parts',
-    cargoWeight: '22,000 lbs',
-    vehicleType: 'Dry Van - 53ft',
-    price: 3100.00,
-    driverInfo: 'Pending',
-    pickupDate: '2026-06-04',
-    deliveryDate: '2026-06-06',
-    status: 'Pending',
-    notes: 'JIT delivery required.',
-  }
-];
-
-const StatusBadge = ({ status }) => {
-  const getStatusStyles = () => {
-    switch (status) {
-      case 'New': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: Clock };
-      case 'Pending': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: Clock };
-      case 'In Progress': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: Truck };
-      case 'Completed': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: CheckCircle2 };
-      case 'Cancelled': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: XCircle };
-      default: return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: FileText };
-    }
-  };
-  
-  const styles = getStatusStyles();
-  const Icon = styles.icon;
-
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-      padding: '6px 12px',
-      borderRadius: '20px',
-      backgroundColor: styles.bg,
-      color: styles.color,
-      fontSize: '13px',
-      fontWeight: 600,
-    }}>
-      <Icon size={14} />
-      {status}
-    </span>
-  );
-};
-
-const DealModule = () => {
-  const [deals, setDeals] = useState(mockDeals);
+const DealModule = ({ deals, setDeals }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [selectedDeal, setSelectedDeal] = useState(null);
-  const [isNewDealOpen, setIsNewDealOpen] = useState(false);
-  const [editingDeal, setEditingDeal] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  
+  // Modals state
+  const [viewDeal, setViewDeal] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editDeal, setEditDeal] = useState(null);
+  const [dealToDelete, setDealToDelete] = useState(null);
 
-  const stats = [
-    { title: 'Total Deals', value: '1,284', trend: '+12%', icon: Handshake, isUp: true },
-    { title: 'Active Deals', value: '42', trend: '+5%', icon: Truck, isUp: true },
-    { title: 'Completed', value: '1,190', trend: '+18%', icon: CheckCircle2, isUp: true },
-    { title: 'Revenue', value: '$1.4M', trend: '+24%', icon: DollarSign, isUp: true },
-  ];
-
-  let filteredDeals = deals.filter(deal => {
-    const matchesSearch = deal.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          deal.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          deal.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || deal.status === filterStatus;
-    return matchesSearch && matchesStatus;
+  // Form input state (with Status, Fleet & Driver, and Warehouse Assignment removed)
+  const [formData, setFormData] = useState({
+    title: '',
+    customerName: '',
+    customerPhone: '',
+    pickupLocation: '',
+    deliveryLocation: '',
+    cargoType: '',
+    orderedQuantity: '',
+    shippedQuantity: '',
+    price: '',
+    pickupDate: '',
+    deliveryDate: '',
+    notes: ''
   });
 
-  if (sortConfig.key) {
-    filteredDeals.sort((a, b) => {
-      let valA = a[sortConfig.key];
-      let valB = b[sortConfig.key];
+  // Calculate Dashboard statistics
+  const totalDeals = deals.length;
+  const totalRevenue = deals.reduce((sum, d) => sum + Number(d.price || 0), 0);
+  const totalOrdered = deals.reduce((sum, d) => sum + Number(d.orderedQuantity || 0), 0);
+  const totalShipped = deals.reduce((sum, d) => sum + Number(d.shippedQuantity || 0), 0);
 
-      if (sortConfig.key === 'price') {
-        valA = parseFloat(valA);
-        valB = parseFloat(valB);
-      } else if (sortConfig.key === 'pickupDate' || sortConfig.key === 'deliveryDate') {
-        valA = new Date(valA).getTime();
-        valB = new Date(valB).getTime();
-      }
-
-      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
+  // Form opening and reset
+  const handleOpenCreateModal = () => {
+    setEditDeal(null);
+    setFormData({
+      title: '',
+      customerName: '',
+      customerPhone: '',
+      pickupLocation: '',
+      deliveryLocation: '',
+      cargoType: '',
+      orderedQuantity: '',
+      shippedQuantity: '',
+      price: '',
+      pickupDate: '',
+      deliveryDate: '',
+      notes: ''
     });
-  }
-
-  const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
+    setIsFormOpen(true);
   };
 
-  const handleExport = () => {
-    const headers = ['Deal ID', 'Title', 'Customer Name', 'Pickup Location', 'Delivery Location', 'Cargo Type', 'Weight', 'Vehicle Type', 'Price', 'Driver', 'Pickup Date', 'Delivery Date', 'Status'];
-    const csvContent = [
-      headers.join(','),
-      ...filteredDeals.map(deal => [
-        deal.id, `"${deal.title}"`, `"${deal.customerName}"`, `"${deal.pickupLocation}"`, `"${deal.deliveryLocation}"`, deal.cargoType, deal.cargoWeight, deal.vehicleType, deal.price, deal.driverInfo, deal.pickupDate, deal.deliveryDate, deal.status
-      ].join(','))
-    ].join('\n');
+  const handleOpenEditModal = (deal, e) => {
+    e.stopPropagation();
+    setEditDeal(deal);
+    setFormData({ ...deal });
+    setIsFormOpen(true);
+  };
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute("download", "deals_export.csv");
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    const ordered = Number(formData.orderedQuantity || 0);
+    const shipped = Number(formData.shippedQuantity || 0);
+
+    if (editDeal) {
+      // Edit mode
+      setDeals(prev => prev.map(d => d.id === editDeal.id ? { 
+        ...formData, 
+        price: Number(formData.price || 0),
+        orderedQuantity: ordered,
+        shippedQuantity: shipped
+      } : d));
+    } else {
+      // Create mode
+      const newId = `DEAL-${String(deals.length + 1).padStart(3, '0')}`;
+      const newDeal = {
+        ...formData,
+        id: newId,
+        price: Number(formData.price || 0),
+        orderedQuantity: ordered,
+        shippedQuantity: shipped
+      };
+      setDeals(prev => [newDeal, ...prev]);
+    }
+    setIsFormOpen(false);
+  };
+
+  const triggerDeleteConfirm = (deal, e) => {
+    e.stopPropagation();
+    setDealToDelete(deal);
+  };
+
+  const confirmDeleteDeal = () => {
+    if (dealToDelete) {
+      setDeals(prev => prev.filter(d => d.id !== dealToDelete.id));
+      if (viewDeal?.id === dealToDelete.id) setViewDeal(null);
+      setDealToDelete(null);
     }
   };
+
+  // Search Logic
+  const filteredDeals = deals.filter(deal => {
+    return (
+      deal.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      deal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      deal.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      deal.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      deal.deliveryLocation.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.4 }}
-      className="main-content deal-module"
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.35 }}
+      className="main-content"
+      style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}
     >
-      <div className="header">
+      {/* Header */}
+      <div className="header" style={{ margin: 0 }}>
         <div>
-          <h1 className="page-title">Deals Management</h1>
-          <p className="page-subtitle">Track and manage freight shipping deals</p>
+          <h1 className="page-title">Deal Management</h1>
+          <p className="page-subtitle">Track and coordinate your active logistics deals</p>
         </div>
-        <div className="header-actions">
-          <button className="btn" onClick={handleExport}>
-            <Download size={18} />
-            Export
-          </button>
-          <button className="btn btn-primary" onClick={() => { setEditingDeal(null); setIsNewDealOpen(true); }}>
-            <Plus size={18} />
-            New Deal
-          </button>
-        </div>
+        <button className="btn btn-primary" onClick={handleOpenCreateModal} style={{ gap: '8px' }}>
+          <Plus size={16} /> Create Deal
+        </button>
       </div>
 
+      {/* Dashboard Statistics Cards */}
       <div className="stats-grid">
-        {stats.map((stat, idx) => {
-          const Icon = stat.icon;
+        {[
+          { title: 'Total Deals', value: totalDeals, icon: Briefcase, desc: 'Active order records' },
+          { title: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: DollarSign, desc: 'Cumulative deals value' },
+          { title: 'Total Ordered', value: totalOrdered.toLocaleString(), icon: Archive, desc: 'Requested units count' },
+          { title: 'Total Shipped', value: totalShipped.toLocaleString(), icon: Truck, desc: 'Dispatched units count' }
+        ].map((card, index) => {
+          const Icon = card.icon || Truck;
           return (
-            <div key={idx} className="stat-card">
+            <div key={index} className="stat-card">
               <div className="stat-header">
-                <span className="stat-title">{stat.title}</span>
+                <span className="stat-title">{card.title}</span>
                 <div className="stat-icon">
-                  <Icon size={20} />
+                  <Icon size={18} />
                 </div>
               </div>
-              <div className="stat-value">
-                {stat.value}
-                <span className={`stat-trend ${stat.isUp ? 'trend-up' : 'trend-down'}`}>
-                  {stat.trend}
-                </span>
-              </div>
+              <div className="stat-value">{card.value}</div>
+              <div className="stat-desc">{card.desc}</div>
             </div>
           );
         })}
       </div>
 
-      <div className="panel deals-panel">
-        <div className="deals-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
-          <div className="search-bar" style={{ position: 'relative', width: '300px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              placeholder="Search deals..." 
+      {/* Filters & Actions Panel */}
+      <div className="panel" style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '20px' }}>
+          {/* Search Box */}
+          <div style={{ position: 'relative', flex: '1', minWidth: '260px', maxWidth: '400px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search by ID, customer, route..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 width: '100%',
-                padding: '10px 12px 10px 40px',
+                padding: '10px 12px 10px 38px',
                 borderRadius: '8px',
                 border: '1px solid var(--border)',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
                 color: 'var(--text-main)',
                 fontSize: '14px',
                 outline: 'none',
               }}
             />
           </div>
-          <div className="filter-group" style={{ display: 'flex', gap: '8px' }}>
-            {['All', 'New', 'Pending', 'In Progress', 'Completed'].map(status => (
-              <button 
-                key={status}
-                onClick={() => setFilterStatus(status)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '20px',
-                  border: '1px solid var(--border)',
-                  backgroundColor: filterStatus === status ? 'var(--text-main)' : 'transparent',
-                  color: filterStatus === status ? 'var(--bg-dark)' : 'var(--text-muted)',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
         </div>
 
+        {/* Data Table */}
         <div className="table-container">
-          <table className="deals-table">
+          <table>
             <thead>
               <tr>
-                <th onClick={() => handleSort('id')} style={{ cursor: 'pointer' }}>Deal Info {sortConfig.key === 'id' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th onClick={() => handleSort('pickupLocation')} style={{ cursor: 'pointer' }}>Route {sortConfig.key === 'pickupLocation' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th onClick={() => handleSort('cargoType')} style={{ cursor: 'pointer' }}>Cargo Details {sortConfig.key === 'cargoType' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th onClick={() => handleSort('pickupDate')} style={{ cursor: 'pointer' }}>Dates {sortConfig.key === 'pickupDate' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th onClick={() => handleSort('price')} style={{ cursor: 'pointer' }}>Price {sortConfig.key === 'price' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                <th></th>
+                <th>Deal ID</th>
+                <th>Customer</th>
+                <th>Route</th>
+                <th>Cargo & Quantities</th>
+                <th>Price</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredDeals.map(deal => (
-                <tr key={deal.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedDeal(deal)}>
-                  <td>
-                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>{deal.id}</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{deal.customerName}</div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                      <MapPin size={14} color="var(--text-muted)" />
-                      <span>{deal.pickupLocation}</span>
-                      <ArrowRight size={14} color="var(--text-muted)" />
-                      <span>{deal.deliveryLocation}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                      <Box size={14} color="var(--text-muted)" />
-                      <span style={{ fontSize: '13px' }}>{deal.cargoType}</span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{deal.cargoWeight} • {deal.vehicleType}</div>
-                  </td>
-                  <td>
-                    <div style={{ fontSize: '13px', marginBottom: '4px' }}>Pickup: {deal.pickupDate}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Delivery: {deal.deliveryDate}</div>
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>${deal.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  </td>
-                  <td>
-                    <StatusBadge status={deal.status} />
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                      <MoreVertical size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredDeals.map((deal) => {
+                const isSurplus = deal.shippedQuantity > deal.orderedQuantity;
+                const surplusAmount = isSurplus ? (deal.shippedQuantity - deal.orderedQuantity) : 0;
+                
+                return (
+                  <tr key={deal.id} style={{ cursor: 'pointer' }} onClick={() => setViewDeal(deal)}>
+                    <td style={{ fontWeight: 600 }}>{deal.id}</td>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{deal.customerName}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Phone size={10} /> {deal.customerPhone}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                        <span style={{ fontWeight: 500 }}>{deal.pickupLocation}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>→</span>
+                        <span style={{ fontWeight: 500 }}>{deal.deliveryLocation}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{deal.cargoType}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Ordered: {deal.orderedQuantity} / Shipped: {deal.shippedQuantity}
+                      </div>
+                      {isSurplus && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-main)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px', opacity: 0.8 }}>
+                          <Archive size={10} /> Storage Surplus: {surplusAmount}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>
+                      ${deal.price.toLocaleString()}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                        <button className="btn" style={{ padding: '6px' }} title="View details" onClick={() => setViewDeal(deal)}>
+                          <Eye size={14} />
+                        </button>
+                        <button className="btn" style={{ padding: '6px' }} title="Edit deal" onClick={(e) => handleOpenEditModal(deal, e)}>
+                          <Edit2 size={14} />
+                        </button>
+                        <button className="btn" style={{ padding: '6px' }} title="Delete deal" onClick={(e) => triggerDeleteConfirm(deal, e)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {filteredDeals.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              No deals found matching your criteria.
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+              No deals match your search settings.
             </div>
           )}
         </div>
       </div>
 
+      {/* Details View Modal */}
       <AnimatePresence>
-        {selectedDeal && (
-          <motion.div 
+        {viewDeal && (
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="deal-modal-overlay"
             style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              zIndex: 100,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backdropFilter: 'blur(4px)',
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 100,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(5px)'
             }}
-            onClick={() => setSelectedDeal(null)}
+            onClick={() => setViewDeal(null)}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="deal-modal-content panel"
+              className="panel"
               style={{
-                width: '600px',
-                maxWidth: '90vw',
-                maxHeight: '90vh',
-                overflowY: 'auto',
-                position: 'relative',
+                width: '640px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
+                position: 'relative', padding: '28px', backgroundColor: 'var(--bg-card)',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)'
               }}
               onClick={e => e.stopPropagation()}
             >
-              <button 
-                onClick={() => setSelectedDeal(null)}
-                style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              <button
+                onClick={() => setViewDeal(null)}
+                style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
-                <XCircle size={24} />
+                <X size={20} />
               </button>
-              
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                  <h2 style={{ fontSize: '24px', margin: 0 }}>{selectedDeal.title}</h2>
-                  <StatusBadge status={selectedDeal.status} />
-                </div>
-                <div style={{ color: 'var(--text-muted)' }}>{selectedDeal.id} • {selectedDeal.customerName}</div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', letterSpacing: '1px' }}>{viewDeal.id}</span>
               </div>
+              <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 20px 0', color: '#fff' }}>{viewDeal.title}</h2>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
-                <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                  <h3 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <MapPin size={16} /> Route Info
-                  </h3>
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Pickup Location</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDeal.pickupLocation}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{selectedDeal.pickupDate}</div>
+              {/* Grid content */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                {/* Column 1 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Briefcase size={12} /> Customer Name
+                    </h3>
+                    <div style={{ fontWeight: 500 }}>{viewDeal.customerName}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Delivery Location</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDeal.deliveryLocation}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{selectedDeal.deliveryDate}</div>
+                    <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Phone size={12} /> Customer Phone
+                    </h3>
+                    <div>{viewDeal.customerPhone}</div>
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <MapPin size={12} /> Route / Locations
+                    </h3>
+                    <div style={{ fontSize: '13px' }}>
+                      <div style={{ fontWeight: 500 }}>Pickup: {viewDeal.pickupLocation}</div>
+                      <div style={{ fontWeight: 500 }}>Delivery: {viewDeal.deliveryLocation}</div>
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                  <h3 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Truck size={16} /> Logistics
-                  </h3>
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Cargo</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDeal.cargoType} ({selectedDeal.cargoWeight})</div>
-                  </div>
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Equipment</div>
-                    <div style={{ fontWeight: 500 }}>{selectedDeal.vehicleType}</div>
+                {/* Column 2 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      Cargo & Quantities
+                    </h3>
+                    <div style={{ fontWeight: 500 }}>{viewDeal.cargoType}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-main)', marginTop: '4px' }}>
+                      Ordered Quantity: <strong>{viewDeal.orderedQuantity}</strong><br />
+                      Shipped Quantity: <strong>{viewDeal.shippedQuantity}</strong>
+                    </div>
+                    {viewDeal.shippedQuantity > viewDeal.orderedQuantity && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-main)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                        <Archive size={14} /> Warehouse Storage Surplus: {viewDeal.shippedQuantity - viewDeal.orderedQuantity} units
+                      </div>
+                    )}
                   </div>
                   <div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Driver</div>
-                    <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <User size={14} /> {selectedDeal.driverInfo}
+                    <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={12} /> Timeline
+                    </h3>
+                    <div style={{ fontSize: '13px' }}>
+                      <div>Pickup: {viewDeal.pickupDate}</div>
+                      <div>Delivery: {viewDeal.deliveryDate}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <DollarSign size={12} /> Price / Valuation
+                    </h3>
+                    <div style={{ fontSize: '18px', fontWeight: 700 }}>
+                      ${viewDeal.price.toLocaleString()}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '24px' }}>
-                <h3 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '8px' }}>Financials</h3>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Total Freight Cost</span>
-                  <span style={{ fontSize: '20px', fontWeight: 700 }}>${selectedDeal.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
+              {/* Notes */}
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={12} /> Deal Notes
+                </h3>
+                <p style={{ fontSize: '13px', margin: 0, color: 'var(--text-main)', lineHeight: '1.5' }}>
+                  {viewDeal.notes || 'No additional notes provided for this deal.'}
+                </p>
               </div>
 
-              {selectedDeal.notes && (
-                <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                  <h3 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '8px' }}>Notes</h3>
-                  <p style={{ fontSize: '14px', lineHeight: '1.5' }}>{selectedDeal.notes}</p>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={() => {
-                  setIsLoading(true);
-                  setTimeout(() => {
-                    setDeals(deals.filter(d => d.id !== selectedDeal.id));
-                    setSelectedDeal(null);
-                    setIsLoading(false);
-                  }, 600);
-                }}>
-                  <Trash2 size={16} /> Delete
+              {/* Modal Actions */}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '28px', justifyContent: 'flex-end' }}>
+                <button className="btn" style={{ color: 'var(--text-muted)' }} onClick={(e) => { setViewDeal(null); triggerDeleteConfirm(viewDeal, e); }}>
+                  Delete Deal
                 </button>
-                <button className="btn" onClick={() => setSelectedDeal(null)}>Close</button>
-                <button className="btn btn-primary" onClick={() => {
-                  setEditingDeal(selectedDeal);
-                  setSelectedDeal(null);
-                  setIsNewDealOpen(true);
-                }}>
-                  <Edit2 size={16} /> Edit Deal
+                <button className="btn btn-primary" onClick={(e) => { setViewDeal(null); handleOpenEditModal(viewDeal, e); }}>
+                  Edit Deal
+                </button>
+                <button className="btn" onClick={() => setViewDeal(null)}>
+                  Close
                 </button>
               </div>
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
 
-        {isNewDealOpen && (
-          <motion.div 
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {dealToDelete && (
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="deal-modal-overlay"
             style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              zIndex: 100,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backdropFilter: 'blur(4px)',
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 110,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(6px)'
             }}
-            onClick={() => setIsNewDealOpen(false)}
+            onClick={() => setDealToDelete(null)}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="deal-modal-content panel"
+              className="panel"
               style={{
-                width: '600px',
-                maxWidth: '90vw',
-                maxHeight: '90vh',
-                overflowY: 'auto',
-                position: 'relative',
+                width: '450px', maxWidth: '90vw', padding: '24px', backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border)', textAlign: 'center'
               }}
               onClick={e => e.stopPropagation()}
             >
-              <button 
-                onClick={() => setIsNewDealOpen(false)}
-                style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-              >
-                <XCircle size={24} />
-              </button>
-              
-              <div style={{ marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '24px', margin: 0, marginBottom: '8px' }}>{editingDeal ? 'Edit Deal' : 'Create New Deal'}</h2>
-                <div style={{ color: 'var(--text-muted)' }}>{editingDeal ? 'Update the details for this freight shipment.' : 'Fill in the details for the new freight shipment.'}</div>
+              <AlertTriangle size={48} color="var(--text-main)" style={{ margin: '0 auto 16px auto', opacity: 0.8 }} />
+              <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 12px 0', color: '#fff' }}>
+                Confirm Deal Deletion
+              </h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                Are you sure you want to delete the deal created by customer <strong style={{ color: '#fff' }}>{dealToDelete.customerName}</strong>?<br />
+                This action is permanent and cannot be undone.
+              </p>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button className="btn" onClick={() => setDealToDelete(null)}>
+                  Cancel
+                </button>
+                <button className="btn btn-primary" onClick={confirmDeleteDeal}>
+                  Delete Now
+                </button>
               </div>
-
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                setIsLoading(true);
-                
-                setTimeout(() => {
-                  const formData = new FormData(e.target);
-                  
-                  if (editingDeal) {
-                    const updatedDeal = {
-                      ...editingDeal,
-                      title: formData.get('title'),
-                      customerName: formData.get('customerName'),
-                      pickupLocation: formData.get('pickupLocation'),
-                      deliveryLocation: formData.get('deliveryLocation'),
-                      cargoType: formData.get('cargoType'),
-                      cargoWeight: formData.get('cargoWeight'),
-                      vehicleType: formData.get('vehicleType'),
-                      price: parseFloat(formData.get('price')),
-                    };
-                    setDeals(deals.map(d => d.id === editingDeal.id ? updatedDeal : d));
-                  } else {
-                    const newDeal = {
-                      id: `DL-${Math.floor(Math.random() * 9000) + 1000}`,
-                      title: formData.get('title'),
-                      customerName: formData.get('customerName'),
-                      pickupLocation: formData.get('pickupLocation'),
-                      deliveryLocation: formData.get('deliveryLocation'),
-                      cargoType: formData.get('cargoType'),
-                      cargoWeight: formData.get('cargoWeight'),
-                      vehicleType: formData.get('vehicleType'),
-                      price: parseFloat(formData.get('price')),
-                      driverInfo: 'Pending',
-                      pickupDate: new Date().toISOString().split('T')[0],
-                      deliveryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-                      status: 'New',
-                      notes: '',
-                    };
-                    setDeals([newDeal, ...deals]);
-                  }
-                  
-                  setIsNewDealOpen(false);
-                  setIsLoading(false);
-                }, 600);
-              }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Deal Title</label>
-                    <input type="text" name="title" defaultValue={editingDeal?.title || ''} placeholder="e.g. Electronics to Seattle Hub" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Customer Name</label>
-                    <input type="text" name="customerName" defaultValue={editingDeal?.customerName || ''} placeholder="e.g. TechCorp Industries" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Pickup Location</label>
-                    <input type="text" name="pickupLocation" defaultValue={editingDeal?.pickupLocation || ''} placeholder="City, State" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Delivery Location</label>
-                    <input type="text" name="deliveryLocation" defaultValue={editingDeal?.deliveryLocation || ''} placeholder="City, State" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Cargo Type</label>
-                    <input type="text" name="cargoType" defaultValue={editingDeal?.cargoType || ''} placeholder="e.g. Electronics" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Cargo Weight</label>
-                    <input type="text" name="cargoWeight" defaultValue={editingDeal?.cargoWeight || ''} placeholder="e.g. 12,500 lbs" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Vehicle Type</label>
-                    <input type="text" name="vehicleType" defaultValue={editingDeal?.vehicleType || ''} placeholder="e.g. Dry Van - 53ft" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Price ($)</label>
-                    <input type="number" name="price" defaultValue={editingDeal?.price || ''} step="0.01" placeholder="3450.00" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn" onClick={() => setIsNewDealOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={isLoading}>
-                    {editingDeal ? 'Update Deal' : 'Create Deal'}
-                  </button>
-                </div>
-              </form>
             </motion.div>
           </motion.div>
         )}
+      </AnimatePresence>
 
-        {isLoading && (
-          <motion.div 
+      {/* Create / Edit Form Modal */}
+      <AnimatePresence>
+        {isFormOpen && (
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            className="deal-modal-overlay"
             style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              zIndex: 1000,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backdropFilter: 'blur(4px)',
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.75)', zIndex: 100,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backdropFilter: 'blur(5px)'
             }}
+            onClick={() => setIsFormOpen(false)}
           >
-            <motion.div 
-              animate={{ rotate: 360 }} 
-              transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-              style={{ color: 'var(--text-main)' }}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="panel"
+              style={{
+                width: '720px', maxWidth: '95vw', maxHeight: '90vh', overflowY: 'auto',
+                position: 'relative', padding: '28px', backgroundColor: 'var(--bg-card)',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)'
+              }}
+              onClick={e => e.stopPropagation()}
             >
-              <Loader2 size={48} />
+              <button
+                onClick={() => setIsFormOpen(false)}
+                style={{ position: 'absolute', top: '20px', right: '20px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+
+              <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 24px 0', color: '#fff' }}>
+                {editDeal ? `Edit Deal ${editDeal.id}` : 'Create Logistics Deal'}
+              </h2>
+
+              <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Section 1: General Info */}
+                <div>
+                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>General Details</h3>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Deal Title / Description</label>
+                    <input
+                      type="text"
+                      name="title"
+                      required
+                      value={formData.title}
+                      onChange={handleFormChange}
+                      style={{
+                        width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Section 2: Customer */}
+                <div>
+                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Customer Information</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Customer Name</label>
+                      <input
+                        type="text"
+                        name="customerName"
+                        required
+                        value={formData.customerName}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Customer Phone</label>
+                      <input
+                        type="text"
+                        name="customerPhone"
+                        required
+                        value={formData.customerPhone}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: Cargo & Routing */}
+                <div>
+                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Route & Cargo Details</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Pickup Location</label>
+                      <input
+                        type="text"
+                        name="pickupLocation"
+                        required
+                        value={formData.pickupLocation}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Delivery Location</label>
+                      <input
+                        type="text"
+                        name="deliveryLocation"
+                        required
+                        value={formData.deliveryLocation}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Cargo Type</label>
+                      <input
+                        type="text"
+                        name="cargoType"
+                        required
+                        placeholder="e.g. Krasovka"
+                        value={formData.cargoType}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Ordered Quantity</label>
+                      <input
+                        type="number"
+                        name="orderedQuantity"
+                        required
+                        placeholder="e.g. 200"
+                        value={formData.orderedQuantity}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Shipped Quantity</label>
+                      <input
+                        type="number"
+                        name="shippedQuantity"
+                        required
+                        placeholder="e.g. 450"
+                        value={formData.shippedQuantity}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Price (USD)</label>
+                    <input
+                      type="number"
+                      name="price"
+                      required
+                      value={formData.price}
+                      onChange={handleFormChange}
+                      style={{
+                        width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Section 4: Timeline & Notes */}
+                <div>
+                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Timeline & Notes</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Pickup Date</label>
+                      <input
+                        type="date"
+                        name="pickupDate"
+                        required
+                        value={formData.pickupDate}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Delivery Date</label>
+                      <input
+                        type="date"
+                        name="deliveryDate"
+                        required
+                        value={formData.deliveryDate}
+                        onChange={handleFormChange}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Special Instructions / Notes</label>
+                    <textarea
+                      name="notes"
+                      rows="3"
+                      value={formData.notes}
+                      onChange={handleFormChange}
+                      style={{
+                        width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none', resize: 'vertical'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Form Actions */}
+                <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn" onClick={() => setIsFormOpen(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    {editDeal ? 'Save Changes' : 'Create Deal'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}

@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Plus, Filter, MoreVertical, 
-  MapPin, Box, User, Phone, CheckCircle2, 
-  XCircle, Warehouse, AlertTriangle, Layers, Trash2, Edit2, Loader2, Info, Download
+import {
+  Search, MapPin, Box, User, CheckCircle2,
+  XCircle, Warehouse, AlertTriangle, Layers, Loader2, Info, ArrowRight, Clock
 } from 'lucide-react';
-
-const mockStorage = [];
 
 const StatusBadge = ({ status }) => {
   return (
@@ -14,7 +11,6 @@ const StatusBadge = ({ status }) => {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '6px',
-      padding: '6px 12px',
       borderRadius: '20px',
       backgroundColor: 'rgba(255, 255, 255, 0.05)',
       color: 'var(--text-main)',
@@ -30,43 +26,11 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
+const StorageModule = ({ warehouses, setWarehouses, deals }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedWH, setSelectedWH] = useState(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDispatchOpen, setIsDispatchOpen] = useState(false);
-  const [editingWH, setEditingWH] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [selectedFormStatus, setSelectedFormStatus] = useState('Active');
-
-  const handleConfirmDispatch = (amount, formData) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const updatedOccupied = selectedWH.occupiedSpace - amount;
-      const updatedAvailable = selectedWH.capacity - updatedOccupied;
-      const updatedStatus = updatedOccupied === selectedWH.capacity ? 'Full' : (updatedOccupied === 0 ? 'Active' : selectedWH.status);
-      
-      const updatedWH = {
-        ...selectedWH,
-        occupiedSpace: updatedOccupied,
-        availableSpace: updatedAvailable,
-        status: updatedStatus
-      };
-      
-      setWarehouses(warehouses.map(w => w.id === selectedWH.id ? updatedWH : w));
-      
-      if (onDispatchCargo) {
-        onDispatchCargo(formData);
-      }
-      
-      setIsDispatchOpen(false);
-      setSelectedWH(null);
-      setIsLoading(false);
-    }, 600);
-  };
 
   const totalWarehouses = warehouses.length;
   const totalCapacity = warehouses.reduce((sum, wh) => sum + wh.capacity, 0);
@@ -81,9 +45,9 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
   ];
 
   let filteredWarehouses = warehouses.filter(wh => {
-    const matchesSearch = wh.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          wh.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          wh.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = wh.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      wh.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      wh.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'All' || wh.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -112,85 +76,10 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
     setSortConfig({ key, direction });
   };
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    setTimeout(() => {
-      const formData = new FormData(e.target);
-      const capacity = parseFloat(formData.get('capacity'));
-      const occupiedSpace = parseFloat(formData.get('occupiedSpace'));
-      const availableSpace = capacity - occupiedSpace;
-
-      if (editingWH) {
-        const updatedWH = {
-          ...editingWH,
-          name: formData.get('name'),
-          location: formData.get('location'),
-          capacity,
-          occupiedSpace,
-          availableSpace,
-          type: formData.get('type'),
-          manager: formData.get('manager'),
-          contact: formData.get('contact'),
-          status: formData.get('status'),
-        };
-        setWarehouses(warehouses.map(w => w.id === editingWH.id ? updatedWH : w));
-      } else {
-        const newWH = {
-          id: `WH-00${warehouses.length + 1}`,
-          name: formData.get('name'),
-          location: formData.get('location'),
-          capacity,
-          occupiedSpace,
-          availableSpace,
-          type: formData.get('type'),
-          manager: formData.get('manager'),
-          contact: formData.get('contact'),
-          status: formData.get('status'),
-          createdDate: new Date().toISOString().split('T')[0],
-        };
-        setWarehouses([newWH, ...warehouses]);
-      }
-      
-      setIsFormOpen(false);
-      setIsLoading(false);
-    }, 600);
-  };
-
-  const handleDelete = (id) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setWarehouses(warehouses.filter(w => w.id !== id));
-      setSelectedWH(null);
-      setIsLoading(false);
-    }, 600);
-  };
-
-  const handleExport = () => {
-    const headers = ['Storage ID', 'Warehouse Name', 'Location', 'Capacity', 'Available Space', 'Occupied Space', 'Type', 'Manager', 'Contact', 'Status', 'Created Date'];
-    const csvContent = [
-      headers.join(','),
-      ...filteredWarehouses.map(wh => [
-        wh.id, `"${wh.name}"`, `"${wh.location}"`, wh.capacity, wh.availableSpace, wh.occupiedSpace, wh.type, `"${wh.manager}"`, `"${wh.contact}"`, wh.status, wh.createdDate
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute("download", "storage_export.csv");
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
+  const expectedDeals = (deals || []);
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -227,9 +116,9 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
         <div className="deals-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
           <div className="search-bar" style={{ position: 'relative', width: '300px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              placeholder="Search warehouses..." 
+            <input
+              type="text"
+              placeholder="Search warehouses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -246,7 +135,7 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
           </div>
           <div className="filter-group" style={{ display: 'flex', gap: '8px' }}>
             {['All', 'Active', 'Full', 'Maintenance', 'Inactive'].map(status => (
-              <button 
+              <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
                 style={{
@@ -309,9 +198,6 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
                       <button className="btn" style={{ padding: '6px' }} onClick={(e) => { e.stopPropagation(); setSelectedWH(wh); }}>
                         <Info size={16} />
                       </button>
-                      <button className="btn" style={{ padding: '6px' }} onClick={(e) => { e.stopPropagation(); setEditingWH(wh); setIsFormOpen(true); }}>
-                        <Edit2 size={16} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -326,9 +212,64 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
         </div>
       </div>
 
+      {/* "Kutilyapti" Table Panel */}
+      <div className="panel deals-panel" style={{ marginTop: '32px' }}>
+        <h2 className="panel-header" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Clock size={20} /> Kutilyapti (Kutilayotgan yuklar / Expected Shipments)
+        </h2>
+        <div className="table-container">
+          <table className="deals-table">
+            <thead>
+              <tr>
+                <th>Deal ID</th>
+                <th>Buyurtmachi (Customer)</th>
+                <th>Yuk turi (Cargo Type)</th>
+                <th>Buyurtma / Jo'natilgan (Ordered / Shipped)</th>
+                <th>Belgilangan Ombor (Warehouse)</th>
+                <th>Yo'nalish (Route)</th>
+                <th>Holat (Status)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expectedDeals.map(deal => {
+                const whName = warehouses.find(w => w.id === deal.assignedWarehouseId)?.name || 'Tayinlanmagan';
+                return (
+                  <tr key={deal.id}>
+                    <td style={{ fontWeight: 600 }}>{deal.id}</td>
+                    <td style={{ fontWeight: 500 }}>{deal.customerName}</td>
+                    <td>{deal.cargoType}</td>
+                    <td>
+                      Ordered: {deal.orderedQuantity || 0} / Shipped: {deal.shippedQuantity || 0}
+                    </td>
+                    <td style={{ color: '#60a5fa', fontWeight: 500 }}>{whName}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                        <span>{deal.pickupLocation}</span>
+                        <ArrowRight size={12} color="var(--text-muted)" />
+                        <span>{deal.deliveryLocation}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="status-badge status-transit" style={{ padding: '4px 10px', fontSize: '12px' }}>Kutilmoqda</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {expectedDeals.length === 0 && (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    Kutilayotgan yuklar yo'q.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <AnimatePresence>
         {selectedWH && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -345,7 +286,7 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
             }}
             onClick={() => setSelectedWH(null)}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -353,13 +294,13 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
               style={{ width: '600px', maxWidth: '90vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
               onClick={e => e.stopPropagation()}
             >
-              <button 
+              <button
                 onClick={() => setSelectedWH(null)}
                 style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
                 <XCircle size={24} />
               </button>
-              
+
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                   <h2 style={{ fontSize: '24px', margin: 0 }}>{selectedWH.name}</h2>
@@ -382,9 +323,6 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
                     <User size={16} /> Management
                   </h3>
                   <div style={{ fontWeight: 500, marginBottom: '4px' }}>{selectedWH.manager}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Phone size={14} /> {selectedWH.contact}
-                  </div>
                 </div>
               </div>
 
@@ -404,11 +342,11 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
                   <span>Available Space</span>
                   <span style={{ fontWeight: 600, color: '#34d399' }}>{selectedWH.availableSpace.toLocaleString()} sq ft</span>
                 </div>
-                
+
                 <div className="progress-container">
-                  <div 
-                    className="progress-bar" 
-                    style={{ 
+                  <div
+                    className="progress-bar"
+                    style={{
                       width: `${(selectedWH.occupiedSpace / selectedWH.capacity) * 100}%`,
                       backgroundColor: selectedWH.occupiedSpace === selectedWH.capacity ? '#f87171' : 'var(--text-main)'
                     }}
@@ -419,304 +357,13 @@ const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={() => handleDelete(selectedWH.id)}>
-                  <Trash2 size={16} /> Delete
-                </button>
-                {selectedWH.occupiedSpace > 0 && (
-                  <button className="btn btn-primary" onClick={() => setIsDispatchOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Download size={16} style={{ transform: 'rotate(180deg)' }} /> Dispatch Cargo
-                  </button>
-                )}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
                 <button className="btn" onClick={() => setSelectedWH(null)}>Close</button>
-                <button className="btn" onClick={() => { 
-                  setEditingWH(selectedWH); 
-                  setSelectedFormStatus(selectedWH.status);
-                  setSelectedWH(null); 
-                  setIsFormOpen(true); 
-                }}>
-                  <Edit2 size={16} /> Edit Storage
-                </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {isFormOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="deal-modal-overlay"
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
-            onClick={() => setIsFormOpen(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="deal-modal-content panel"
-              style={{ width: '600px', maxWidth: '90vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
-              onClick={e => e.stopPropagation()}
-            >
-              <button onClick={() => setIsFormOpen(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <XCircle size={24} />
-              </button>
-              
-              <div style={{ marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '24px', margin: 0, marginBottom: '8px' }}>{editingWH ? 'Edit Storage' : 'Create New Storage'}</h2>
-                <div style={{ color: 'var(--text-muted)' }}>{editingWH ? 'Update warehouse details below.' : 'Add a new warehouse to your network.'}</div>
-              </div>
-
-              <form onSubmit={handleSave}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Warehouse Name</label>
-                    <input type="text" name="name" defaultValue={editingWH?.name || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Location</label>
-                    <input type="text" name="location" defaultValue={editingWH?.location || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Storage Type</label>
-                    <input type="text" name="type" defaultValue={editingWH?.type || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Status</label>
-                    <div style={{ position: 'relative' }}>
-                      <input type="hidden" name="status" value={selectedFormStatus} />
-                      <div 
-                        onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                        style={{ 
-                          width: '100%', padding: '10px', borderRadius: '8px', 
-                          border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', 
-                          color: 'var(--text-main)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                        }}
-                      >
-                        {selectedFormStatus}
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: statusDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"></polyline></svg>
-                      </div>
-                      <AnimatePresence>
-                        {statusDropdownOpen && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            style={{
-                              position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px',
-                              backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
-                              borderRadius: '8px', overflow: 'hidden', zIndex: 50,
-                              boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                            }}
-                          >
-                            {['Active', 'Full', 'Maintenance', 'Inactive'].map(s => (
-                              <div 
-                                key={s}
-                                onClick={() => { setSelectedFormStatus(s); setStatusDropdownOpen(false); }}
-                                style={{
-                                  padding: '10px 12px', cursor: 'pointer',
-                                  backgroundColor: selectedFormStatus === s ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                                  color: 'var(--text-main)', fontSize: '14px',
-                                  transition: 'background-color 0.2s'
-                                }}
-                                onMouseEnter={(e) => { if(selectedFormStatus !== s) e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.05)' }}
-                                onMouseLeave={(e) => { if(selectedFormStatus !== s) e.target.style.backgroundColor = 'transparent' }}
-                              >
-                                {s}
-                              </div>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Total Capacity (sq ft)</label>
-                    <input type="number" name="capacity" defaultValue={editingWH?.capacity || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Occupied Space (sq ft)</label>
-                    <input type="number" name="occupiedSpace" defaultValue={editingWH?.occupiedSpace || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Manager Name</label>
-                    <input type="text" name="manager" defaultValue={editingWH?.manager || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Contact Number</label>
-                    <input type="text" name="contact" defaultValue={editingWH?.contact || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn" onClick={() => setIsFormOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={isLoading}>
-                    {editingWH ? 'Update Storage' : 'Create Storage'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {isDispatchOpen && selectedWH && (
-          <DispatchModal 
-            warehouse={selectedWH} 
-            onClose={() => setIsDispatchOpen(false)} 
-            onConfirm={handleConfirmDispatch} 
-          />
-        )}
-
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
-          >
-            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} style={{ color: 'var(--text-main)' }}>
-              <Loader2 size={48} />
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
-  );
-};
-
-const DispatchModal = ({ warehouse, onClose, onConfirm }) => {
-  const [form, setForm] = useState({
-    amount: '',
-    shipper: warehouse.manager || 'Tashkent Central Hub',
-    consignee: 'Global Trade Inc',
-    origin: warehouse.location,
-    port: 'LA Port',
-    mode: 'sea',
-    value: '$25,000',
-    hs: '8708.29',
-    spendings: '$1,200',
-    spendingBreakdown: 'Customs Duty ($900) + Service Fee ($300)'
-  });
-  const [error, setError] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const amountNum = parseFloat(form.amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      setError('Please enter a valid dispatch amount');
-      return;
-    }
-    if (amountNum > warehouse.occupiedSpace) {
-      setError(`Cannot dispatch more than currently occupied space (${warehouse.occupiedSpace.toLocaleString()} sq ft)`);
-      return;
-    }
-    onConfirm(amountNum, form);
-  };
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="deal-modal-overlay"
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
-      onClick={onClose}
-    >
-      <motion.div 
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="deal-modal-content panel"
-        style={{ width: '550px', maxWidth: '90vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <button onClick={onClose} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-          <XCircle size={24} />
-        </button>
-        
-        <div style={{ marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '22px', margin: 0, marginBottom: '6px' }}>Dispatch Cargo for Customs</h2>
-          <div style={{ color: 'var(--text-muted)' }}>From {warehouse.name} ({warehouse.location})</div>
-        </div>
-
-        {error && (
-          <div style={{ padding: '12px', background: 'rgba(255,77,79,0.1)', border: '1px solid rgba(255,77,79,0.2)', borderRadius: '8px', color: '#ff4d4f', fontSize: '13px', marginBottom: '16px', fontWeight: 500 }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
-            <div style={{ gridColumn: 'span 2' }}>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Dispatch Amount (sq ft) • Max {warehouse.occupiedSpace.toLocaleString()}</label>
-              <input 
-                type="number" 
-                placeholder="e.g. 5000" 
-                value={form.amount} 
-                onChange={e => setForm({ ...form, amount: e.target.value })} 
-                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} 
-                required 
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Shipper (Origin)</label>
-              <input type="text" value={form.shipper} onChange={e => setForm({ ...form, shipper: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Consignee (Destination)</label>
-              <input type="text" value={form.consignee} onChange={e => setForm({ ...form, consignee: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Port of Entry</label>
-              <input type="text" value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>HS Code</label>
-              <input type="text" value={form.hs} onChange={e => setForm({ ...form, hs: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Cargo Declared Value</label>
-              <input type="text" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Transport Mode</label>
-              <select value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }}>
-                <option value="sea">Sea Freight</option>
-                <option value="air">Air Freight</option>
-                <option value="road">Road Freight</option>
-                <option value="courier">Courier</option>
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Customs Spendings / Fees</label>
-              <input type="text" value={form.spendings} onChange={e => setForm({ ...form, spendings: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Spendings Purpose / Breakdown</label>
-              <input type="text" value={form.spendingBreakdown} onChange={e => setForm({ ...form, spendingBreakdown: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Dispatch Cargo</button>
-          </div>
-        </form>
-      </motion.div>
     </motion.div>
   );
 };
