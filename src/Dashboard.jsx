@@ -101,7 +101,7 @@ const Dashboard = () => {
           title="Active Shipments" 
           value="42" 
           icon={Truck} 
-          color="blue" 
+          color="neutral" 
           trend="up" 
           trendValue="+12%" 
           desc="Currently in transit"
@@ -111,7 +111,7 @@ const Dashboard = () => {
           title="Delivered Today" 
           value="28" 
           icon={PackageCheck} 
-          color="green" 
+          color="neutral" 
           trend="up" 
           trendValue="+8%" 
           desc="Successful deliveries"
@@ -121,7 +121,7 @@ const Dashboard = () => {
           title="Pending Orders" 
           value="156" 
           icon={Clock} 
-          color="red" 
+          color="neutral" 
           trend="down" 
           trendValue="-5%" 
           desc="Awaiting processing"
@@ -131,7 +131,7 @@ const Dashboard = () => {
           title="Revenue (MTD)" 
           value="$284,590" 
           icon={CircleDollarSign} 
-          color="purple" 
+          color="neutral" 
           trend="up" 
           trendValue="+15%" 
           desc="Month to date"
@@ -165,12 +165,9 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {shipments.map((shipment, index) => (
-                <motion.tr 
+              {shipments.map((shipment) => (
+                <tr 
                   key={shipment.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.6 + (index * 0.1) }}
                 >
                   <td style={{ fontWeight: 500 }}>{shipment.id}</td>
                   <td>{shipment.customer}</td>
@@ -178,7 +175,7 @@ const Dashboard = () => {
                   <td style={{ color: 'var(--text-muted)' }}>{shipment.dest}</td>
                   <td>{shipment.eta}</td>
                   <td>{getStatusBadge(shipment.status)}</td>
-                </motion.tr>
+                </tr>
               ))}
             </tbody>
           </table>
