@@ -30,17 +30,43 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const StorageModule = () => {
-  const [warehouses, setWarehouses] = useState(mockStorage);
+const StorageModule = ({ warehouses = [], setWarehouses, onDispatchCargo }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedWH, setSelectedWH] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDispatchOpen, setIsDispatchOpen] = useState(false);
   const [editingWH, setEditingWH] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [selectedFormStatus, setSelectedFormStatus] = useState('Active');
+
+  const handleConfirmDispatch = (amount, formData) => {
+    setIsLoading(true);
+    setTimeout(() => {
+      const updatedOccupied = selectedWH.occupiedSpace - amount;
+      const updatedAvailable = selectedWH.capacity - updatedOccupied;
+      const updatedStatus = updatedOccupied === selectedWH.capacity ? 'Full' : (updatedOccupied === 0 ? 'Active' : selectedWH.status);
+      
+      const updatedWH = {
+        ...selectedWH,
+        occupiedSpace: updatedOccupied,
+        availableSpace: updatedAvailable,
+        status: updatedStatus
+      };
+      
+      setWarehouses(warehouses.map(w => w.id === selectedWH.id ? updatedWH : w));
+      
+      if (onDispatchCargo) {
+        onDispatchCargo(formData);
+      }
+      
+      setIsDispatchOpen(false);
+      setSelectedWH(null);
+      setIsLoading(false);
+    }, 600);
+  };
 
   const totalWarehouses = warehouses.length;
   const totalCapacity = warehouses.reduce((sum, wh) => sum + wh.capacity, 0);
@@ -393,12 +419,17 @@ const StorageModule = () => {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={() => handleDelete(selectedWH.id)}>
                   <Trash2 size={16} /> Delete
                 </button>
+                {selectedWH.occupiedSpace > 0 && (
+                  <button className="btn btn-primary" onClick={() => setIsDispatchOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Download size={16} style={{ transform: 'rotate(180deg)' }} /> Dispatch Cargo
+                  </button>
+                )}
                 <button className="btn" onClick={() => setSelectedWH(null)}>Close</button>
-                <button className="btn btn-primary" onClick={() => { 
+                <button className="btn" onClick={() => { 
                   setEditingWH(selectedWH); 
                   setSelectedFormStatus(selectedWH.status);
                   setSelectedWH(null); 
@@ -538,6 +569,14 @@ const StorageModule = () => {
           </motion.div>
         )}
 
+        {isDispatchOpen && selectedWH && (
+          <DispatchModal 
+            warehouse={selectedWH} 
+            onClose={() => setIsDispatchOpen(false)} 
+            onConfirm={handleConfirmDispatch} 
+          />
+        )}
+
         {isLoading && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -551,6 +590,133 @@ const StorageModule = () => {
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const DispatchModal = ({ warehouse, onClose, onConfirm }) => {
+  const [form, setForm] = useState({
+    amount: '',
+    shipper: warehouse.manager || 'Tashkent Central Hub',
+    consignee: 'Global Trade Inc',
+    origin: warehouse.location,
+    port: 'LA Port',
+    mode: 'sea',
+    value: '$25,000',
+    hs: '8708.29',
+    spendings: '$1,200',
+    spendingBreakdown: 'Customs Duty ($900) + Service Fee ($300)'
+  });
+  const [error, setError] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const amountNum = parseFloat(form.amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setError('Please enter a valid dispatch amount');
+      return;
+    }
+    if (amountNum > warehouse.occupiedSpace) {
+      setError(`Cannot dispatch more than currently occupied space (${warehouse.occupiedSpace.toLocaleString()} sq ft)`);
+      return;
+    }
+    onConfirm(amountNum, form);
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="deal-modal-overlay"
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="deal-modal-content panel"
+        style={{ width: '550px', maxWidth: '90vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button onClick={onClose} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <XCircle size={24} />
+        </button>
+        
+        <div style={{ marginBottom: '24px' }}>
+          <h2 style={{ fontSize: '22px', margin: 0, marginBottom: '6px' }}>Dispatch Cargo for Customs</h2>
+          <div style={{ color: 'var(--text-muted)' }}>From {warehouse.name} ({warehouse.location})</div>
+        </div>
+
+        {error && (
+          <div style={{ padding: '12px', background: 'rgba(255,77,79,0.1)', border: '1px solid rgba(255,77,79,0.2)', borderRadius: '8px', color: '#ff4d4f', fontSize: '13px', marginBottom: '16px', fontWeight: 500 }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Dispatch Amount (sq ft) • Max {warehouse.occupiedSpace.toLocaleString()}</label>
+              <input 
+                type="number" 
+                placeholder="e.g. 5000" 
+                value={form.amount} 
+                onChange={e => setForm({ ...form, amount: e.target.value })} 
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} 
+                required 
+              />
+            </div>
+            
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Shipper (Origin)</label>
+              <input type="text" value={form.shipper} onChange={e => setForm({ ...form, shipper: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Consignee (Destination)</label>
+              <input type="text" value={form.consignee} onChange={e => setForm({ ...form, consignee: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Port of Entry</label>
+              <input type="text" value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>HS Code</label>
+              <input type="text" value={form.hs} onChange={e => setForm({ ...form, hs: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Cargo Declared Value</label>
+              <input type="text" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Transport Mode</label>
+              <select value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }}>
+                <option value="sea">Sea Freight</option>
+                <option value="air">Air Freight</option>
+                <option value="road">Road Freight</option>
+                <option value="courier">Courier</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Customs Spendings / Fees</label>
+              <input type="text" value={form.spendings} onChange={e => setForm({ ...form, spendings: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Spendings Purpose / Breakdown</label>
+              <input type="text" value={form.spendingBreakdown} onChange={e => setForm({ ...form, spendingBreakdown: e.target.value })} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', outline: 'none' }} required />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Dispatch Cargo</button>
+          </div>
+        </form>
+      </motion.div>
     </motion.div>
   );
 };
