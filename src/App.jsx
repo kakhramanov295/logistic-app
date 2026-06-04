@@ -6,6 +6,9 @@ import StorageModule from './StorageModule';
 import ApplicationModule from './ApplicationModule';
 import CustomPage from './CustomPage';
 import AcceptancePage from './AcceptancePage';
+import LoginPage from './LoginPage';
+import ProfilePage from './ProfilePage';
+import UsersPage from './UsersPage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const INITIAL_WAREHOUSES = [
@@ -82,6 +85,10 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [deals, setDeals] = useState(INITIAL_DEALS);
   const [warehouses, setWarehouses] = useState(INITIAL_WAREHOUSES);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const handleLogin = (user) => setCurrentUser(user);
+  const handleLogout = () => setCurrentUser(null);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -97,18 +104,42 @@ function App() {
         return <CustomPage key="custom" />;
       case 'acceptance':
         return <AcceptancePage key="acceptance" />;
+      case 'profile':
+        if (currentUser && currentUser.role === 'Admin') {
+          return <ProfilePage key="profile" currentUser={currentUser} setCurrentUser={setCurrentUser} />;
+        }
+        return <Dashboard key="dashboard" />;
+      case 'users':
+        if (currentUser && currentUser.role === 'Admin') {
+          return <UsersPage key="users" currentUser={currentUser} />;
+        }
+        return <Dashboard key="dashboard" />;
       default:
         return <Dashboard key="dashboard" />;
     }
   };
 
+  if (!currentUser) {
+    return (
+      <AnimatePresence mode="wait">
+        <LoginPage key="login" onLogin={handleLogin} />
+      </AnimatePresence>
+    );
+  }
+
   return (
-    <div className="app-container">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <motion.div
+      className="app-container"
+      key="main-app"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
+    >
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} />
       <AnimatePresence mode="wait">
         {renderContent()}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 
