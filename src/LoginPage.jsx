@@ -1,9 +1,9 @@
-const SUPABASE_URL = "https://vcjyiihovljzkcpsxpwz.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_NemRADDZEtihhs7fCJ5acA_8h0jVARB";
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Hexagon } from 'lucide-react';
+
+const SUPABASE_URL = "https://vcjyiihovljzkcpsxpwz.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_NemRADDZEtihhs7fCJ5acA_8h0jVARB";
 
 
 const USERS = [
@@ -20,6 +20,7 @@ function LoginPage({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [blockedUser, setBlockedUser] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -57,8 +58,34 @@ function LoginPage({ onLogin }) {
       const data = await response.json();
       const sbUser = data.user;
       
-      const role = sbUser.user_metadata?.role || (email.startsWith('admin') ? 'Admin' : 'User');
-      const name = sbUser.user_metadata?.name || 'Users';
+      let role = sbUser.user_metadata?.role || (email.startsWith('admin') ? 'Admin' : 'User');
+      let name = sbUser.user_metadata?.name || 'Users';
+      let blocked = false;
+
+      try {
+        const profileRes = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${sbUser.id}&select=*`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${data.access_token}`
+          }
+        });
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          if (profileData && profileData[0]) {
+            blocked = !!profileData[0].blocked;
+            if (profileData[0].role) role = profileData[0].role;
+            if (profileData[0].name) name = profileData[0].name;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch user profile details:", err);
+      }
+
+      if (blocked) {
+        setLoading(false);
+        setBlockedUser({ name, email: sbUser.email });
+        return;
+      }
 
       onLogin({
         id: sbUser.id,
@@ -66,10 +93,15 @@ function LoginPage({ onLogin }) {
         email: sbUser.email,
         role: role,
         name: name,
-        token: data.access_token
+        token: data.access_token,
+        blocked: false
       });
     } catch (err) {
-      setError(err.message || "Tizimga kirishda xatolik yuz berdi.");
+      let errMsg = err.message || "Tizimga kirishda xatolik yuz berdi.";
+      if (errMsg.toLowerCase().includes("confirm") || errMsg.toLowerCase().includes("verify") || errMsg.toLowerCase().includes("verified")) {
+        errMsg = "Email manzili tasdiqlanmagan. Iltimos, Supabase sozlamalarida 'Confirm email'ni o'chiring yoki ushbu foydalanuvchining emailini tasdiqlang.";
+      }
+      setError(errMsg);
       setLoading(false);
     }
   };
@@ -86,6 +118,74 @@ function LoginPage({ onLogin }) {
       <div className="login-blob login-blob-1" />
       <div className="login-blob login-blob-2" />
       <div className="login-blob login-blob-3" />
+
+      {/* Full-screen loading overlay when login request is in progress */}
+      {loading && (
+        <motion.div
+          className="app-loading-screen"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25 }}
+          style={{ zIndex: 9998 }}
+        >
+          <div className="app-loading-blob app-loading-blob-1" />
+          <div className="app-loading-blob app-loading-blob-2" />
+          <motion.div
+            className="app-loading-content"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+          >
+            <div className="app-loading-logo">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+              </svg>
+            </div>
+            <span className="app-loading-title">Logistic</span>
+            <div className="app-loading-dots">
+              <span /><span /><span />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Blocked User Modal */}
+      {blockedUser && (
+        <div className="modal-overlay" style={{ zIndex: 9999, backdropFilter: 'blur(12px)' }}>
+          <motion.div
+            className="blocked-card"
+            initial={{ scale: 0.85, opacity: 0, y: 30 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="blocked-icon-wrap">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <h2 className="blocked-title">Hisob bloklangan</h2>
+            <p className="blocked-subtitle">
+              Sizning hisobingiz administrator tomonidan vaqtincha bloklangan.<br/>
+              Muammo bo'yicha admin bilan bog'laning.
+            </p>
+            <div className="blocked-user-info">
+              <span>{blockedUser.name}</span>
+              <span style={{ opacity: 0.5, fontSize: '12px' }}>{blockedUser.email}</span>
+            </div>
+            <button
+              className="blocked-logout-btn"
+              onClick={() => { setBlockedUser(null); setUsername(''); setPassword(''); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+              Yopish
+            </button>
+          </motion.div>
+        </div>
+      )}
 
       <motion.div
         className="login-card"
@@ -107,9 +207,9 @@ function LoginPage({ onLogin }) {
         </div>
 
         <form className="login-form" onSubmit={handleSubmit} autoComplete="off">
-          {/* Username (Gmail) */}
+          {/* Username (Gmail or Username) */}
           <div className="login-form-group">
-            <label className="login-label" htmlFor="login-username">Gmail</label>
+            <label className="login-label" htmlFor="login-username">Gmail yoki Foydalanuvchi nomi</label>
             <div className="login-input-wrapper">
               <span className="login-input-icon">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -121,7 +221,7 @@ function LoginPage({ onLogin }) {
                 id="login-username"
                 type="text"
                 className="login-input"
-                placeholder="Gmail kiriting"
+                placeholder="Gmail yoki foydalanuvchi nomini kiriting"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required

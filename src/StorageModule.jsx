@@ -5,6 +5,7 @@ import {
   MapPin, Box, User, Phone, CheckCircle2, 
   XCircle, Warehouse, AlertTriangle, Layers, Trash2, Edit2, Loader2, Info, Download
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const mockStorage = [];
 
@@ -31,7 +32,7 @@ const StatusBadge = ({ status }) => {
 };
 
 const StorageModule = () => {
-  const [warehouses, setWarehouses] = useState(mockStorage);
+  const [warehouses, setWarehouses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedWH, setSelectedWH] = useState(null);
@@ -41,6 +42,21 @@ const StorageModule = () => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [selectedFormStatus, setSelectedFormStatus] = useState('Active');
+
+  React.useEffect(() => {
+    fetchWarehouses();
+  }, []);
+
+  const fetchWarehouses = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('warehouses').select('*');
+    if (error) {
+      console.error('Error fetching warehouses:', error);
+    } else {
+      setWarehouses(data || []);
+    }
+    setIsLoading(false);
+  };
 
   const totalWarehouses = warehouses.length;
   const totalCapacity = warehouses.reduce((sum, wh) => sum + wh.capacity, 0);
@@ -86,59 +102,81 @@ const StorageModule = () => {
     setSortConfig({ key, direction });
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     
-    setTimeout(() => {
-      const formData = new FormData(e.target);
-      const capacity = parseFloat(formData.get('capacity'));
-      const occupiedSpace = parseFloat(formData.get('occupiedSpace'));
-      const availableSpace = capacity - occupiedSpace;
+    const formData = new FormData(e.target);
+    const capacity = parseFloat(formData.get('capacity'));
+    const occupiedSpace = parseFloat(formData.get('occupiedSpace'));
+    const availableSpace = capacity - occupiedSpace;
 
-      if (editingWH) {
-        const updatedWH = {
-          ...editingWH,
-          name: formData.get('name'),
-          location: formData.get('location'),
-          capacity,
-          occupiedSpace,
-          availableSpace,
-          type: formData.get('type'),
-          manager: formData.get('manager'),
-          contact: formData.get('contact'),
-          status: formData.get('status'),
-        };
-        setWarehouses(warehouses.map(w => w.id === editingWH.id ? updatedWH : w));
-      } else {
-        const newWH = {
-          id: `WH-00${warehouses.length + 1}`,
-          name: formData.get('name'),
-          location: formData.get('location'),
-          capacity,
-          occupiedSpace,
-          availableSpace,
-          type: formData.get('type'),
-          manager: formData.get('manager'),
-          contact: formData.get('contact'),
-          status: formData.get('status'),
-          createdDate: new Date().toISOString().split('T')[0],
-        };
-        setWarehouses([newWH, ...warehouses]);
-      }
+    if (editingWH) {
+      const updatedWH = {
+        name: formData.get('name'),
+        location: formData.get('location'),
+        capacity,
+        occupiedSpace,
+        availableSpace,
+        type: formData.get('type'),
+        manager: formData.get('manager'),
+        contact: formData.get('contact'),
+        status: formData.get('status'),
+      };
       
-      setIsFormOpen(false);
-      setIsLoading(false);
-    }, 600);
+      const { error } = await supabase
+        .from('warehouses')
+        .update(updatedWH)
+        .eq('id', editingWH.id);
+
+      if (error) {
+        console.error('Error updating warehouse:', error);
+      } else {
+        await fetchWarehouses();
+      }
+    } else {
+      const newWH = {
+        name: formData.get('name'),
+        location: formData.get('location'),
+        capacity,
+        occupiedSpace,
+        availableSpace,
+        type: formData.get('type'),
+        manager: formData.get('manager'),
+        contact: formData.get('contact'),
+        status: formData.get('status'),
+        createdDate: new Date().toISOString().split('T')[0],
+      };
+      
+      const { error } = await supabase
+        .from('warehouses')
+        .insert([newWH]);
+
+      if (error) {
+        console.error('Error creating warehouse:', error);
+      } else {
+        await fetchWarehouses();
+      }
+    }
+    
+    setIsFormOpen(false);
+    setIsLoading(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setWarehouses(warehouses.filter(w => w.id !== id));
+    const { error } = await supabase
+      .from('warehouses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting warehouse:', error);
+    } else {
+      await fetchWarehouses();
       setSelectedWH(null);
-      setIsLoading(false);
-    }, 600);
+    }
+    setIsLoading(false);
   };
 
   const handleExport = () => {

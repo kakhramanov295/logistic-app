@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Users, UserPlus, Shield, Mail, Trash2, Edit, AlertCircle, RefreshCw } from 'lucide-react';
+import { Users, UserPlus, Shield, Mail, Trash2, Edit, AlertCircle, RefreshCw, Lock, Unlock } from 'lucide-react';
 
 const SUPABASE_URL = "https://vcjyiihovljzkcpsxpwz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NemRADDZEtihhs7fCJ5acA_8h0jVARB";
@@ -9,6 +9,9 @@ function UsersPage({ currentUser }) {
   const [usersList, setUsersList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Custom confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, message: '', onConfirm: null });
   
   // Create User Form State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -139,6 +142,30 @@ function UsersPage({ currentUser }) {
       }
 
       const authData = await authResponse.json();
+      const userId = authData.user?.id;
+
+      if (userId) {
+        // Manually insert the user profile to guarantee a row exists in the profiles table
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${currentUser.token || SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              id: userId,
+              email: newEmail,
+              name: newName,
+              role: newRole,
+              blocked: false
+            })
+          });
+        } catch (profileErr) {
+          console.warn("Could not insert profile row manually:", profileErr);
+        }
+      }
 
       // If trigger is set up correctly, it will auto-populate profiles.
       // Let's add locally to list immediately for smooth UX
@@ -157,30 +184,67 @@ function UsersPage({ currentUser }) {
       setNewName('');
       setNewRole('User');
     } catch (err) {
-      setError(err.message);
+      const errMsg = err.message ? err.message.toLowerCase() : "";
+      if (errMsg.includes("rate limit")) {
+        setError("Foydalanuvchi ro'yxatdan o'tkazish cheklovi (rate limit) oshib ketdi. Supabase bepul tarifida 1 soatda faqat 3 ta foydalanuvchi qo'shishga ruxsat beriladi. Buni o'chirish uchun Supabase Dashboard-da: Authentication -> Providers -> Email bo'limidan 'Rate Limit' sozlamasini o'chiring yoki cheklov vaqtini kuting.");
+      } else if (errMsg.includes("confirmation email") || errMsg.includes("confirm email") || errMsg.includes("sending confirmation")) {
+        setError("Tasdiqlash xatini yuborishda xatolik yuz berdi. Supabase-da yangi foydalanuvchi qo'shishda email tasdiqlash shart emasligini belgilang. Buni o'chirish uchun: Supabase Dashboard -> Authentication -> Email Provider -> 'Confirm email' sozlamasini o'chirib qo'ying (toggle off).");
+      } else {
+        setError(err.message);
+      }
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleDeleteUser = async (id, email) => {
-    if (!window.confirm(`${email} foydalanuvchisini o'chirishni xohlaysizmi?`)) return;
-    
-    // Remove from local list
-    setUsersList(prev => prev.filter(u => u.id !== id));
-    
-    try {
-      // Delete request to profiles table
-      await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
-        method: 'DELETE',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${currentUser.token || SUPABASE_ANON_KEY}`
+  const handleDeleteUser = (id, email) => {
+    setConfirmModal({
+      isOpen: true,
+      message: `${email} foydalanuvchisini o'chirishni xohlaysizmi?`,
+      onConfirm: async () => {
+        // Remove from local list
+        setUsersList(prev => prev.filter(u => u.id !== id));
+        
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${currentUser.token || SUPABASE_ANON_KEY}`
+            }
+          });
+        } catch (err) {
+          console.error("Supabase delete failed", err);
         }
-      });
-    } catch (err) {
-      console.error("Supabase delete failed", err);
-    }
+      }
+    });
+  };
+
+  const handleBlockUser = (user) => {
+    const newBlocked = !user.blocked;
+    const action = newBlocked ? 'bloklash' : 'blokni ochish';
+    setConfirmModal({
+      isOpen: true,
+      message: `${user.email} foydalanuvchisini ${action}ni xohlaysizmi?`,
+      onConfirm: async () => {
+        // Update locally
+        setUsersList(prev => prev.map(u => u.id === user.id ? { ...u, blocked: newBlocked } : u));
+
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${currentUser.token || SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({ blocked: newBlocked })
+          });
+        } catch (err) {
+          console.error("Block failed:", err);
+        }
+      }
+    });
   };
 
   return (
@@ -227,6 +291,7 @@ function UsersPage({ currentUser }) {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>#</th>
                   <th>Foydalanuvchi</th>
                   <th>Email</th>
                   <th>Telefon</th>
@@ -235,14 +300,24 @@ function UsersPage({ currentUser }) {
                 </tr>
               </thead>
               <tbody>
-                {usersList.map((user) => (
+                {usersList.map((user, index) => (
                   <tr key={user.id}>
+                    <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600, fontSize: '13px' }}>
+                      {index + 1}
+                    </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div className="sidebar-avatar" style={{ width: 30, height: 30, fontSize: 11 }}>
+                        <div className="sidebar-avatar" style={{ width: 30, height: 30, fontSize: 11, opacity: user.blocked ? 0.5 : 1 }}>
                           {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                         </div>
-                        <span style={{ fontWeight: 500 }}>{user.name || 'Users'}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <span style={{ fontWeight: 500, opacity: user.blocked ? 0.6 : 1 }}>{user.name || 'Users'}</span>
+                          {user.blocked && (
+                            <span style={{ fontSize: '10px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Lock size={9} /> Bloklangan
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td>{user.email}</td>
@@ -262,6 +337,20 @@ function UsersPage({ currentUser }) {
                         >
                           <Edit size={14} />
                         </button>
+                        {user.role !== 'Admin' && (
+                          <button 
+                            className="btn" 
+                            style={{ 
+                              padding: '6px 10px', 
+                              color: user.blocked ? '#34d399' : '#fbbf24', 
+                              borderColor: user.blocked ? 'rgba(52,211,153,0.25)' : 'rgba(251,191,36,0.25)'
+                            }}
+                            onClick={() => handleBlockUser(user)}
+                            title={user.blocked ? 'Blokdan chiqarish' : 'Bloklash'}
+                          >
+                            {user.blocked ? <Unlock size={14} /> : <Lock size={14} />}
+                          </button>
+                        )}
                         <button 
                           className="btn" 
                           style={{ padding: '6px 10px', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.2)' }}
@@ -453,6 +542,77 @@ function UsersPage({ currentUser }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Custom Confirmation Modal */}
+      {confirmModal.isOpen && (
+        <div className="modal-overlay" style={{ zIndex: 10000 }}>
+          <div className="modal-content" style={{ 
+            maxWidth: '420px', 
+            background: 'var(--bg-card)', 
+            border: '1px solid var(--border)',
+            borderRadius: '24px',
+            padding: '32px',
+            textAlign: 'center',
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)'
+          }}>
+            <p style={{ 
+              fontSize: '16px', 
+              color: 'var(--text-main)', 
+              marginBottom: '28px', 
+              lineHeight: 1.5,
+              fontWeight: 500 
+            }}>
+              {confirmModal.message}
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button 
+                type="button" 
+                onClick={() => setConfirmModal({ isOpen: false, message: '', onConfirm: null })}
+                style={{ 
+                  background: '#ffedd5', 
+                  color: '#000000', 
+                  border: 'none', 
+                  padding: '12px 28px', 
+                  borderRadius: '30px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  minWidth: '100px',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => e.target.style.opacity = 0.85}
+                onMouseOut={(e) => e.target.style.opacity = 1}
+              >
+                Bekor qilish
+              </button>
+              <button 
+                type="button" 
+                onClick={async () => {
+                  if (confirmModal.onConfirm) {
+                    await confirmModal.onConfirm();
+                  }
+                  setConfirmModal({ isOpen: false, message: '', onConfirm: null });
+                }}
+                style={{ 
+                  background: '#78350f', 
+                  color: '#ffffff', 
+                  border: 'none', 
+                  padding: '12px 28px', 
+                  borderRadius: '30px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  minWidth: '100px',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => e.target.style.opacity = 0.9}
+                onMouseOut={(e) => e.target.style.opacity = 1}
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -5,73 +5,9 @@ import {
   MapPin, Calendar, Truck, User, DollarSign,
   CheckCircle2, Clock, XCircle, FileText, ArrowRight, TrendingUp, Handshake, Box, Loader2, Trash2, Edit2, Download
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
-const mockDeals = [
-  {
-    id: 'DL-8492',
-    title: 'Electronics to Seattle Hub',
-    customerName: 'TechCorp Industries',
-    pickupLocation: 'San Jose, CA',
-    deliveryLocation: 'Seattle, WA',
-    cargoType: 'Electronics',
-    cargoWeight: '12,500 lbs',
-    vehicleType: 'Dry Van - 53ft',
-    price: 3450.00,
-    driverInfo: 'Mike Johnson',
-    pickupDate: '2026-06-01',
-    deliveryDate: '2026-06-03',
-    status: 'In Progress',
-    notes: 'Fragile. Needs careful handling.',
-  },
-  {
-    id: 'DL-8493',
-    title: 'Frozen Goods to Texas',
-    customerName: 'FreshFoods Co',
-    pickupLocation: 'Chicago, IL',
-    deliveryLocation: 'Austin, TX',
-    cargoType: 'Frozen Food',
-    cargoWeight: '38,000 lbs',
-    vehicleType: 'Reefer',
-    price: 4200.00,
-    driverInfo: 'Sarah Connor',
-    pickupDate: '2026-06-02',
-    deliveryDate: '2026-06-05',
-    status: 'New',
-    notes: 'Maintain -10F throughout transit.',
-  },
-  {
-    id: 'DL-8494',
-    title: 'Steel Beams Delivery',
-    customerName: 'BuildRight Construction',
-    pickupLocation: 'Pittsburgh, PA',
-    deliveryLocation: 'New York, NY',
-    cargoType: 'Building Materials',
-    cargoWeight: '45,000 lbs',
-    vehicleType: 'Flatbed',
-    price: 2800.00,
-    driverInfo: 'David Smith',
-    pickupDate: '2026-05-28',
-    deliveryDate: '2026-05-29',
-    status: 'Completed',
-    notes: 'Deliver to active construction site.',
-  },
-  {
-    id: 'DL-8495',
-    title: 'Auto Parts to Assembly',
-    customerName: 'MotorWorks Inc',
-    pickupLocation: 'Detroit, MI',
-    deliveryLocation: 'Atlanta, GA',
-    cargoType: 'Auto Parts',
-    cargoWeight: '22,000 lbs',
-    vehicleType: 'Dry Van - 53ft',
-    price: 3100.00,
-    driverInfo: 'Pending',
-    pickupDate: '2026-06-04',
-    deliveryDate: '2026-06-06',
-    status: 'Pending',
-    notes: 'JIT delivery required.',
-  }
-];
+const mockDeals = [];
 
 const StatusBadge = ({ status }) => {
   const getStatusStyles = () => {
@@ -107,7 +43,7 @@ const StatusBadge = ({ status }) => {
 };
 
 const DealModule = () => {
-  const [deals, setDeals] = useState(mockDeals);
+  const [deals, setDeals] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedDeal, setSelectedDeal] = useState(null);
@@ -115,6 +51,21 @@ const DealModule = () => {
   const [editingDeal, setEditingDeal] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  React.useEffect(() => {
+    fetchDeals();
+  }, []);
+
+  const fetchDeals = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('deals').select('*');
+    if (error) {
+      console.error('Error fetching deals:', error);
+    } else {
+      setDeals(data || []);
+    }
+    setIsLoading(false);
+  };
 
   const stats = [
     { title: 'Total Deals', value: '1,284', trend: '+12%', icon: Handshake, isUp: true },
@@ -435,13 +386,19 @@ const DealModule = () => {
               )}
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={() => {
+                <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={async () => {
                   setIsLoading(true);
-                  setTimeout(() => {
-                    setDeals(deals.filter(d => d.id !== selectedDeal.id));
+                  const { error } = await supabase
+                    .from('deals')
+                    .delete()
+                    .eq('id', selectedDeal.id);
+                  if (error) {
+                    console.error('Error deleting deal:', error);
+                  } else {
+                    await fetchDeals();
                     setSelectedDeal(null);
-                    setIsLoading(false);
-                  }, 600);
+                  }
+                  setIsLoading(false);
                 }}>
                   <Trash2 size={16} /> Delete
                 </button>
@@ -502,49 +459,58 @@ const DealModule = () => {
                 <div style={{ color: 'var(--text-muted)' }}>{editingDeal ? 'Update the details for this freight shipment.' : 'Fill in the details for the new freight shipment.'}</div>
               </div>
 
-              <form onSubmit={(e) => {
+              <form onSubmit={async (e) => {
                 e.preventDefault();
                 setIsLoading(true);
                 
-                setTimeout(() => {
-                  const formData = new FormData(e.target);
+                const formData = new FormData(e.target);
+                
+                if (editingDeal) {
+                  const updatedDeal = {
+                    title: formData.get('title'),
+                    customerName: formData.get('customerName'),
+                    pickupLocation: formData.get('pickupLocation'),
+                    deliveryLocation: formData.get('deliveryLocation'),
+                    cargoType: formData.get('cargoType'),
+                    cargoWeight: formData.get('cargoWeight'),
+                    vehicleType: formData.get('vehicleType'),
+                    price: parseFloat(formData.get('price')),
+                  };
                   
-                  if (editingDeal) {
-                    const updatedDeal = {
-                      ...editingDeal,
-                      title: formData.get('title'),
-                      customerName: formData.get('customerName'),
-                      pickupLocation: formData.get('pickupLocation'),
-                      deliveryLocation: formData.get('deliveryLocation'),
-                      cargoType: formData.get('cargoType'),
-                      cargoWeight: formData.get('cargoWeight'),
-                      vehicleType: formData.get('vehicleType'),
-                      price: parseFloat(formData.get('price')),
-                    };
-                    setDeals(deals.map(d => d.id === editingDeal.id ? updatedDeal : d));
-                  } else {
-                    const newDeal = {
-                      id: `DL-${Math.floor(Math.random() * 9000) + 1000}`,
-                      title: formData.get('title'),
-                      customerName: formData.get('customerName'),
-                      pickupLocation: formData.get('pickupLocation'),
-                      deliveryLocation: formData.get('deliveryLocation'),
-                      cargoType: formData.get('cargoType'),
-                      cargoWeight: formData.get('cargoWeight'),
-                      vehicleType: formData.get('vehicleType'),
-                      price: parseFloat(formData.get('price')),
-                      driverInfo: 'Pending',
-                      pickupDate: new Date().toISOString().split('T')[0],
-                      deliveryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-                      status: 'New',
-                      notes: '',
-                    };
-                    setDeals([newDeal, ...deals]);
-                  }
+                  const { error } = await supabase
+                    .from('deals')
+                    .update(updatedDeal)
+                    .eq('id', editingDeal.id);
+                    
+                  if (error) console.error('Error updating deal:', error);
+                  else await fetchDeals();
+                } else {
+                  const newDeal = {
+                    title: formData.get('title'),
+                    customerName: formData.get('customerName'),
+                    pickupLocation: formData.get('pickupLocation'),
+                    deliveryLocation: formData.get('deliveryLocation'),
+                    cargoType: formData.get('cargoType'),
+                    cargoWeight: formData.get('cargoWeight'),
+                    vehicleType: formData.get('vehicleType'),
+                    price: parseFloat(formData.get('price')),
+                    driverInfo: 'Pending',
+                    pickupDate: new Date().toISOString().split('T')[0],
+                    deliveryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+                    status: 'New',
+                    notes: '',
+                  };
                   
-                  setIsNewDealOpen(false);
-                  setIsLoading(false);
-                }, 600);
+                  const { error } = await supabase
+                    .from('deals')
+                    .insert([newDeal]);
+                    
+                  if (error) console.error('Error creating deal:', error);
+                  else await fetchDeals();
+                }
+                
+                setIsNewDealOpen(false);
+                setIsLoading(false);
               }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div>
