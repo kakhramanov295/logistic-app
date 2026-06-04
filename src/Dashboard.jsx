@@ -101,7 +101,7 @@ const Dashboard = () => {
           title="Active Shipments" 
           value="42" 
           icon={Truck} 
-          color="blue" 
+          color="neutral" 
           trend="up" 
           trendValue="+12%" 
           desc="Currently in transit"
@@ -111,7 +111,7 @@ const Dashboard = () => {
           title="Delivered Today" 
           value="28" 
           icon={PackageCheck} 
-          color="green" 
+          color="neutral" 
           trend="up" 
           trendValue="+8%" 
           desc="Successful deliveries"
@@ -121,7 +121,7 @@ const Dashboard = () => {
           title="Pending Orders" 
           value="156" 
           icon={Clock} 
-          color="red" 
+          color="neutral" 
           trend="down" 
           trendValue="-5%" 
           desc="Awaiting processing"
@@ -131,7 +131,7 @@ const Dashboard = () => {
           title="Revenue (MTD)" 
           value="$284,590" 
           icon={CircleDollarSign} 
-          color="purple" 
+          color="neutral" 
           trend="up" 
           trendValue="+15%" 
           desc="Month to date"

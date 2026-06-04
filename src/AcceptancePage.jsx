@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  PackageCheck, Search, Plus, Eye, X, Download,
+  PackageCheck, Search, Eye, X, Download,
   CheckCircle, Clock, AlertTriangle, XCircle,
   Truck, Ship, Plane, Package, Thermometer,
   Weight, Ruler, User, Calendar, MapPin,
@@ -10,34 +10,34 @@ import {
 } from 'lucide-react';
 
 const statusConfig = {
-  accepted:   { label: 'Accepted',      color: '#22c55e', bg: 'rgba(34,197,94,0.12)',   icon: CheckCircle },
-  pending:    { label: 'Pending',        color: '#f59e0b', bg: 'rgba(245,158,11,0.12)',  icon: Clock },
-  rejected:   { label: 'Rejected',       color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   icon: XCircle },
-  inspection: { label: 'Under Inspect.', color: '#6366f1', bg: 'rgba(99,102,241,0.12)', icon: AlertTriangle },
+  accepted:   { label: 'Accepted',      color: '#f5f5f5', bg: 'rgba(255,255,255,0.12)',  icon: CheckCircle },
+  pending:    { label: 'Pending',        color: '#f5f5f5', bg: 'rgba(255,255,255,0.08)',  icon: Clock },
+  rejected:   { label: 'Rejected',       color: '#f5f5f5', bg: 'rgba(255,255,255,0.06)',  icon: XCircle },
+  inspection: { label: 'Under Inspect.', color: '#f5f5f5', bg: 'rgba(255,255,255,0.10)', icon: AlertTriangle },
 };
 
 const conditionConfig = {
-  good:     { label: 'Good Condition',     color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
-  damaged:  { label: 'Damaged Packaging',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
-  partial:  { label: 'Partial Cargo Damage', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+  good:     { label: 'Good Condition',       color: '#f5f5f5', bg: 'rgba(255,255,255,0.08)' },
+  damaged:  { label: 'Damaged Packaging',    color: '#f5f5f5', bg: 'rgba(255,255,255,0.06)' },
+  partial:  { label: 'Partial Cargo Damage', color: '#f5f5f5', bg: 'rgba(255,255,255,0.07)' },
 };
 
 const modeIcon = { road: Truck, sea: Ship, air: Plane, courier: Package };
 
 const cargos = [
-  { id: 'AC-2024-001', ref: 'SH-2024-001', carrier: 'FastFreight LLC',  sender: 'Acme Corp',       origin: 'New York, NY',  weight: '2,400 kg', dims: '120×80×90 cm', pieces: 12, temp: 'Ambient',  arrival: 'May 14, 09:00', mode: 'road',    status: 'accepted',   condition: 'good',    inspector: 'J. Williams', notes: '' },
-  { id: 'AC-2024-002', ref: 'SH-2024-002', carrier: 'SkyMove Air',      sender: 'Euro Supplies',   origin: 'Hamburg, DE',   weight: '380 kg',   dims: '60×40×50 cm',  pieces: 4,  temp: 'Chilled',  arrival: 'May 15, 14:30', mode: 'air',     status: 'pending',    condition: 'good',    inspector: 'Unassigned', notes: '' },
-  { id: 'AC-2024-003', ref: 'SH-2024-003', carrier: 'OceanPrime',       sender: 'Pacific Goods',   origin: 'Tokyo, JP',     weight: '8,700 kg', dims: '240×120×200',  pieces: 34, temp: 'Ambient',  arrival: 'May 16, 08:15', mode: 'sea',     status: 'inspection', condition: 'partial', inspector: 'M. Torres',  notes: '3 pallets show moisture damage' },
-  { id: 'AC-2024-004', ref: 'SH-2024-004', carrier: 'BorderXpress',     sender: 'Mex Exports',     origin: 'Mexico City',   weight: '1,100 kg', dims: '100×60×80 cm', pieces: 8,  temp: 'Frozen',   arrival: 'May 17, 11:00', mode: 'road',    status: 'rejected',   condition: 'damaged', inspector: 'S. Patel',   notes: 'Packaging integrity compromised, temperature breach' },
-  { id: 'AC-2024-005', ref: 'SH-2024-005', carrier: 'QuickCourier',     sender: 'UK Premium',      origin: 'London, UK',    weight: '95 kg',    dims: '45×30×30 cm',  pieces: 3,  temp: 'Ambient',  arrival: 'May 18, 16:45', mode: 'courier', status: 'accepted',   condition: 'good',    inspector: 'J. Williams', notes: '' },
-  { id: 'AC-2024-006', ref: 'SH-2024-006', carrier: 'MarineRoute',      sender: 'AsiaTech',        origin: 'Seoul, KR',     weight: '5,200 kg', dims: '200×100×150',  pieces: 22, temp: 'Ambient',  arrival: 'May 19, 07:30', mode: 'sea',     status: 'pending',    condition: 'good',    inspector: 'Unassigned', notes: '' },
+  { id: 'AC-2024-001', ref: 'SH-2024-001', carrier: 'FastFreight LLC',  sender: 'Acme Corp',       origin: 'New York, NY',  weight: '2,400 kg', dims: '120×80×90 cm', pieces: 12, temp: 'Ambient',  arrival: 'May 14, 09:00', mode: 'road',    status: 'accepted',   condition: 'good',    inspector: 'J. Williams', notes: '', orderValue: 600000, spendings: [{ label: 'Customs Duty', amount: 120000 }, { label: 'Transport Fee', amount: 50000 }, { label: 'Handling', amount: 30000 }] },
+  { id: 'AC-2024-002', ref: 'SH-2024-002', carrier: 'SkyMove Air',      sender: 'Euro Supplies',   origin: 'Hamburg, DE',   weight: '380 kg',   dims: '60×40×50 cm',  pieces: 4,  temp: 'Chilled',  arrival: 'May 15, 14:30', mode: 'air',     status: 'pending',    condition: 'good',    inspector: 'Unassigned', notes: '', orderValue: 120000, spendings: [{ label: 'Air Freight', amount: 18000 }, { label: 'Import Duty', amount: 9000 }] },
+  { id: 'AC-2024-003', ref: 'SH-2024-003', carrier: 'OceanPrime',       sender: 'Pacific Goods',   origin: 'Tokyo, JP',     weight: '8,700 kg', dims: '240×120×200',  pieces: 34, temp: 'Ambient',  arrival: 'May 16, 08:15', mode: 'sea',     status: 'inspection', condition: 'partial', inspector: 'M. Torres',  notes: '3 pallets show moisture damage', orderValue: 850000, spendings: [{ label: 'Sea Freight', amount: 60000 }, { label: 'Customs', amount: 42000 }, { label: 'Damage Inspection', amount: 15000 }] },
+  { id: 'AC-2024-004', ref: 'SH-2024-004', carrier: 'BorderXpress',     sender: 'Mex Exports',     origin: 'Mexico City',   weight: '1,100 kg', dims: '100×60×80 cm', pieces: 8,  temp: 'Frozen',   arrival: 'May 17, 11:00', mode: 'road',    status: 'rejected',   condition: 'damaged', inspector: 'S. Patel',   notes: 'Packaging integrity compromised, temperature breach', orderValue: 95000, spendings: [{ label: 'Import Duty', amount: 7800 }, { label: 'Cold Chain Fee', amount: 12000 }] },
+  { id: 'AC-2024-005', ref: 'SH-2024-005', carrier: 'QuickCourier',     sender: 'UK Premium',      origin: 'London, UK',    weight: '95 kg',    dims: '45×30×30 cm',  pieces: 3,  temp: 'Ambient',  arrival: 'May 18, 16:45', mode: 'courier', status: 'accepted',   condition: 'good',    inspector: 'J. Williams', notes: '', orderValue: 31500, spendings: [{ label: 'Courier Fee', amount: 2800 }, { label: 'VAT', amount: 1900 }] },
+  { id: 'AC-2024-006', ref: 'SH-2024-006', carrier: 'MarineRoute',      sender: 'AsiaTech',        origin: 'Seoul, KR',     weight: '5,200 kg', dims: '200×100×150',  pieces: 22, temp: 'Ambient',  arrival: 'May 19, 07:30', mode: 'sea',     status: 'pending',    condition: 'good',    inspector: 'Unassigned', notes: '', orderValue: 320000, spendings: [{ label: 'Sea Freight', amount: 28000 }, { label: 'Port Handling', amount: 14000 }, { label: 'Customs', amount: 19000 }] },
 ];
 
 const stats = [
-  { label: 'Total Receipts',   value: '74',  sub: 'This month',       icon: PackageCheck,  color: '#6366f1' },
-  { label: 'Accepted',         value: '55',  sub: '74% acceptance',   icon: CheckCircle,   color: '#22c55e' },
-  { label: 'Under Inspection', value: '10',  sub: 'Awaiting verdict', icon: AlertTriangle, color: '#f59e0b' },
-  { label: 'Rejected',         value: '9',   sub: 'Returned/held',    icon: XCircle,       color: '#ef4444' },
+  { label: 'Total Receipts',   value: '74',  sub: 'This month',       icon: PackageCheck,  color: '#f5f5f5' },
+  { label: 'Accepted',         value: '55',  sub: '74% acceptance',   icon: CheckCircle,   color: '#f5f5f5' },
+  { label: 'Under Inspection', value: '10',  sub: 'Awaiting verdict', icon: AlertTriangle, color: '#f5f5f5' },
+  { label: 'Rejected',         value: '9',   sub: 'Returned/held',    icon: XCircle,       color: '#f5f5f5' },
 ];
 
 const checklist = [
@@ -54,11 +54,29 @@ const checklist = [
 const InspectionModal = ({ record, onClose }) => {
   const [checks, setChecks] = useState(Array(checklist.length).fill(false));
   const [note, setNote] = useState(record.notes);
+  const [spendings, setSpendings] = useState(record.spendings || []);
+  const [newLabel, setNewLabel] = useState('');
+  const [newAmount, setNewAmount] = useState('');
   const cfg = statusConfig[record.status];
   const condCfg = conditionConfig[record.condition];
   const StatusIcon = cfg.icon;
   const ModeIcon = modeIcon[record.mode];
   const allChecked = checks.every(Boolean);
+
+  const totalSpendings = spendings.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+  const orderValue = record.orderValue || 0;
+  const totalCost = orderValue + totalSpendings;
+
+  const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 0 }) + ' UZS';
+
+  const addSpending = () => {
+    if (!newLabel.trim() || !newAmount) return;
+    setSpendings(prev => [...prev, { label: newLabel.trim(), amount: parseFloat(newAmount) || 0 }]);
+    setNewLabel('');
+    setNewAmount('');
+  };
+
+  const removeSpending = (idx) => setSpendings(prev => prev.filter((_, i) => i !== idx));
 
   return (
     <motion.div
@@ -77,7 +95,7 @@ const InspectionModal = ({ record, onClose }) => {
 
         {/* Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-          <div style={{ background: 'rgba(34,197,94,0.15)', borderRadius: 12, padding: 10, color: '#22c55e' }}>
+          <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 12, padding: 10, color: '#f5f5f5' }}>
             <ClipboardList size={22} />
           </div>
           <div>
@@ -114,7 +132,7 @@ const InspectionModal = ({ record, onClose }) => {
         {/* Checklist */}
         <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 12, padding: 18, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 16 }}>
           <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ClipboardList size={16} style={{ color: '#6366f1' }} /> Acceptance Checklist
+            <ClipboardList size={16} style={{ color: '#f5f5f5' }} /> Acceptance Checklist
             <span style={{ marginLeft: 'auto', fontSize: 12, color: '#888' }}>{checks.filter(Boolean).length}/{checklist.length} completed</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -122,12 +140,67 @@ const InspectionModal = ({ record, onClose }) => {
               <label key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                 <div
                   onClick={() => setChecks(p => p.map((c, j) => j === i ? !c : c))}
-                  style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${checks[i] ? '#22c55e' : 'rgba(255,255,255,0.15)'}`, background: checks[i] ? '#22c55e' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
+                  style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${checks[i] ? '#f5f5f5' : 'rgba(255,255,255,0.15)'}`, background: checks[i] ? '#f5f5f5' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
                   {checks[i] && <CheckCircle size={13} color="#fff" fill="#fff" />}
                 </div>
                 <span style={{ fontSize: 13, color: checks[i] ? '#f5f5f5' : '#888', transition: 'color 0.2s' }}>{item}</span>
               </label>
             ))}
+          </div>
+        </div>
+
+        {/* Cost Breakdown */}
+        <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 12, padding: 18, border: '1px solid rgba(255,255,255,0.06)', marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Layers size={16} style={{ color: '#f5f5f5' }} /> Cost Breakdown
+          </div>
+
+          {/* Order value row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ color: '#888', fontSize: 13 }}>Order Value</span>
+            <span style={{ fontWeight: 700, color: '#f5f5f5', fontSize: 14 }}>{fmt(orderValue)}</span>
+          </div>
+
+          {/* Spending rows */}
+          {spendings.map((s, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ color: '#aaa', fontSize: 13 }}>+ {s.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ color: '#f5f5f5', fontWeight: 600, fontSize: 13 }}>{fmt(s.amount)}</span>
+                <button onClick={() => removeSpending(i)} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 2, display: 'flex' }}>
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Add new spending row */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input
+              type="text"
+              placeholder="Spending label (e.g. Customs)"
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              style={{ flex: 2, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8, padding: '7px 10px', color: '#f5f5f5', fontSize: 12, outline: 'none' }}
+            />
+            <input
+              type="number"
+              placeholder="Amount"
+              value={newAmount}
+              onChange={e => setNewAmount(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addSpending()}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8, padding: '7px 10px', color: '#f5f5f5', fontSize: 12, outline: 'none' }}
+            />
+            <button onClick={addSpending} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '7px 14px', color: '#f5f5f5', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>+ Add</button>
+          </div>
+
+          {/* Total row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <div>
+              <div style={{ color: '#666', fontSize: 11, marginBottom: 2 }}>Total Cost</div>
+              <div style={{ color: '#888', fontSize: 11 }}>Order {fmt(orderValue)} + Spendings {fmt(totalSpendings)}</div>
+            </div>
+            <span style={{ fontWeight: 800, color: '#f5f5f5', fontSize: 18 }}>{fmt(totalCost)}</span>
           </div>
         </div>
 
@@ -141,14 +214,14 @@ const InspectionModal = ({ record, onClose }) => {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+          <button style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
             Reject Cargo
           </button>
-          <button style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+          <button style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
             Flag for Inspection
           </button>
           <button
-            style={{ flex: 1.5, padding: '12px 0', borderRadius: 10, background: allChecked ? '#22c55e' : 'rgba(255,255,255,0.05)', border: '1px solid', borderColor: allChecked ? '#22c55e' : 'rgba(255,255,255,0.1)', color: allChecked ? '#fff' : '#555', fontWeight: 700, cursor: allChecked ? 'pointer' : 'default', fontSize: 14, transition: 'all 0.3s' }}>
+            style={{ flex: 1.5, padding: '12px 0', borderRadius: 10, background: allChecked ? '#f5f5f5' : 'rgba(255,255,255,0.05)', border: '1px solid', borderColor: allChecked ? '#f5f5f5' : 'rgba(255,255,255,0.1)', color: allChecked ? '#0a0a0a' : '#555', fontWeight: 700, cursor: allChecked ? 'pointer' : 'default', fontSize: 14, transition: 'all 0.3s' }}>
             {allChecked ? '✓ Confirm Acceptance' : `Complete checklist (${checks.filter(Boolean).length}/{checklist.length})`}
           </button>
         </div>
@@ -200,7 +273,7 @@ const NewReceiptModal = ({ onClose }) => {
             <div style={{ display: 'flex', gap: 8 }}>
               {['road','sea','air','courier'].map(m => (
                 <button key={m} onClick={() => setForm(p => ({ ...p, mode: m }))}
-                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid', borderColor: form.mode === m ? '#22c55e' : 'rgba(255,255,255,0.1)', background: form.mode === m ? 'rgba(34,197,94,0.12)' : 'transparent', color: form.mode === m ? '#22c55e' : '#888', fontWeight: 600, cursor: 'pointer', fontSize: 13, textTransform: 'capitalize' }}>
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1px solid', borderColor: form.mode === m ? '#f5f5f5' : 'rgba(255,255,255,0.1)', background: form.mode === m ? 'rgba(255,255,255,0.1)' : 'transparent', color: form.mode === m ? '#f5f5f5' : '#888', fontWeight: 600, cursor: 'pointer', fontSize: 13, textTransform: 'capitalize' }}>
                   {m}
                 </button>
               ))}
@@ -219,7 +292,6 @@ const AcceptancePage = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected] = useState(null);
-  const [showNew, setShowNew] = useState(false);
 
   const filtered = cargos.filter(c => {
     const matchSearch = !search || c.id.toLowerCase().includes(search.toLowerCase()) || c.carrier.toLowerCase().includes(search.toLowerCase()) || c.sender.toLowerCase().includes(search.toLowerCase());
@@ -230,7 +302,6 @@ const AcceptancePage = () => {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="main-content">
       <AnimatePresence>{selected && <InspectionModal record={selected} onClose={() => setSelected(null)} />}</AnimatePresence>
-      <AnimatePresence>{showNew && <NewReceiptModal onClose={() => setShowNew(false)} />}</AnimatePresence>
 
       {/* Header */}
       <div className="header">
@@ -240,7 +311,6 @@ const AcceptancePage = () => {
         </div>
         <div className="header-actions">
           <button className="btn"><Download size={16} /> Export</button>
-          <button className="btn btn-primary" onClick={() => setShowNew(true)}><Plus size={16} /> Register Receipt</button>
         </div>
       </div>
 
@@ -321,7 +391,7 @@ const AcceptancePage = () => {
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <span style={{ fontWeight: 700, color: '#86efac', fontSize: '15px' }}>{c.id}</span>
+                  <span style={{ fontWeight: 700, color: '#f5f5f5', fontSize: '15px' }}>{c.id}</span>
                   <span style={{ fontSize: '11px', color: '#666', marginLeft: '8px' }}>Ref: {c.ref}</span>
                 </div>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: cfg.bg, color: cfg.color, padding: '5px 11px', borderRadius: '16px', fontSize: '11px', fontWeight: 600 }}>
@@ -338,13 +408,13 @@ const AcceptancePage = () => {
                 
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#22c55e' }}></div>
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f5f5f5' }}></div>
                     <div style={{ width: '25px', height: '1px', borderTop: '2px dotted rgba(255,255,255,0.15)' }}></div>
-                    <div style={{ background: 'rgba(34,197,94,0.12)', color: '#86efac', padding: '5px', borderRadius: '6px', display: 'flex' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.08)', color: '#f5f5f5', padding: '5px', borderRadius: '6px', display: 'flex' }}>
                       <ModeIcon size={12} />
                     </div>
                     <div style={{ width: '25px', height: '1px', borderTop: '2px dotted rgba(255,255,255,0.15)' }}></div>
-                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#22c55e' }}></div>
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#f5f5f5' }}></div>
                   </div>
                 </div>
 
@@ -370,7 +440,7 @@ const AcceptancePage = () => {
                 </div>
                 <div>
                   <div style={{ color: '#555', fontSize: '11px', marginBottom: '2px' }}>Temp. Regime</div>
-                  <div style={{ fontWeight: 600, color: c.temp === 'Ambient' ? '#aaa' : '#7dd3fc' }}>{c.temp}</div>
+                  <div style={{ fontWeight: 600, color: '#f5f5f5' }}>{c.temp}</div>
                 </div>
               </div>
 
@@ -386,7 +456,7 @@ const AcceptancePage = () => {
                   Arrived: {c.arrival}
                 </span>
                 <button onClick={() => setSelected(c)} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '6px 12px', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 600, transition: 'all 0.2s' }}>
-                  <ClipboardList size={13} style={{ color: '#22c55e' }} /> Inspect Cargo
+                  <ClipboardList size={13} style={{ color: '#f5f5f5' }} /> Inspect Cargo
                 </button>
               </div>
             </motion.div>
