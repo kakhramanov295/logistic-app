@@ -27,12 +27,19 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const StorageModule = () => {
+const StorageModule = ({ deals = [] }) => {
   const [warehouses, setWarehouses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedWH, setSelectedWH] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [isLoading, setIsLoading] = useState(false);
+  const [editingWH, setEditingWH] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const expectedDeals = deals.filter(deal => 
+    ['New', 'Pending', 'In Transit', 'In Progress'].includes(deal.status)
+  );
 
   React.useEffect(() => {
     fetchWarehouses();

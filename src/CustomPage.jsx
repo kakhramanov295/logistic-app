@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText, Search, Download, Eye,
@@ -6,28 +6,37 @@ import {
   X, Ship, Plane, Truck, Package, Calendar, Hash,
   Globe, User, DollarSign, Tag, FileCheck
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const statusConfig = {
   waiting:  { label: 'Waiting',   color: '#f5f5f5', bg: 'rgba(255,255,255,0.08)', icon: Clock },
   received: { label: 'Received',  color: '#f5f5f5', bg: 'rgba(255,255,255,0.12)', icon: CheckCircle },
   rejected: { label: 'Rejected',  color: '#f5f5f5', bg: 'rgba(255,255,255,0.06)', icon: XCircle },
   going:    { label: 'Going',     color: '#f5f5f5', bg: 'rgba(255,255,255,0.10)', icon: AlertTriangle },
+  pending:  { label: 'Pending',   color: '#f5f5f5', bg: 'rgba(255,255,255,0.08)', icon: Clock },
 };
 
 const modeIcon = { sea: Ship, air: Plane, road: Truck, courier: Package };
 
-const stats = [
-  { label: 'Total Declarations', value: '128', sub: 'This month',       icon: FileText,      color: '#f5f5f5' },
-  { label: 'Received',           value: '94',  sub: '73% success rate', icon: CheckCircle,   color: '#f5f5f5' },
-  { label: 'Waiting',            value: '21',  sub: 'Awaiting review',  icon: Clock,         color: '#f5f5f5' },
-  { label: 'Rejected',           value: '13',  sub: 'Requires action',  icon: XCircle,       color: '#f5f5f5' },
-];
+const getStats = (decls) => {
+  const total = decls.length;
+  const received = decls.filter(d => d.status === 'received').length;
+  const waiting = decls.filter(d => d.status === 'waiting').length;
+  const rejected = decls.filter(d => d.status === 'rejected').length;
+  return [
+    { label: 'Total Declarations', value: total.toString(), sub: 'Overall volume',       icon: FileText,      color: '#f5f5f5' },
+    { label: 'Received',           value: received.toString(),  sub: `${total ? Math.round((received/total)*100) : 0}% success rate`, icon: CheckCircle,   color: '#f5f5f5' },
+    { label: 'Waiting',            value: waiting.toString(),  sub: 'Awaiting review',  icon: Clock,         color: '#f5f5f5' },
+    { label: 'Rejected',           value: rejected.toString(),  sub: 'Requires action',  icon: XCircle,       color: '#f5f5f5' },
+  ];
+};
 
 /* ─── Detail Modal ─────────────────────────────────────────────────────────── */
 const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
   const [local, setLocal] = useState({ ...record, documents: [...(record.documents || [])] });
   const [saved, setSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const cfg = statusConfig[local.status] || statusConfig['pending'];
   const ModeIcon = modeIcon[local.mode] || Ship;
@@ -37,10 +46,71 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
 
   const addDoc = (doc) => updateLocal({ documents: [...local.documents, doc] });
 
-  const handleSave = () => {
-    setDeclarations(declarations.map(d => d.id === local.id ? { ...local } : d));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2200);
+  const handleSave = async () => {
+    setIsProcessing(true);
+    const { error } = await supabase
+      .from('declarations')
+      .update({
+        shipper: local.shipper,
+        consignee: local.consignee,
+        origin: local.origin,
+        port: local.port,
+        mode: local.mode,
+        value: local.value,
+        hs: local.hs,
+        spendings: local.spendings,
+        spendingBreakdown: local.spendingBreakdown,
+        date: local.date,
+        documents: local.documents
+      })
+      .eq('id', local.id);
+
+    if (!error) {
+      setDeclarations(declarations.map(d => d.id === local.id ? { ...local } : d));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2200);
+    } else {
+      console.error('Error saving declaration:', error);
+      alert('Error updating declaration in database');
+    }
+    setIsProcessing(false);
+    setIsEditing(false);
+  };
+
+  const handlePayFees = async () => {
+    setIsProcessing(true);
+    const newDocs = [...local.documents, { name: 'Customs Fee Receipt', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }];
+    const updatedLocal = { ...local, paymentStatus: 'paid', status: 'received', documents: newDocs };
+    
+    const { error } = await supabase
+      .from('declarations')
+      .update({ paymentStatus: 'paid', status: 'received', documents: newDocs })
+      .eq('id', local.id);
+      
+    if (!error) {
+      setDeclarations(declarations.map(d => d.id === local.id ? updatedLocal : d));
+      updateLocal(updatedLocal);
+    } else {
+      console.error('Error paying fees:', error);
+    }
+    setIsProcessing(false);
+  };
+
+  const handleToggleStatus = async () => {
+    setIsProcessing(true);
+    const nextStatus = local.status === 'received' ? 'rejected' : 'received';
+    const { error } = await supabase
+      .from('declarations')
+      .update({ status: nextStatus })
+      .eq('id', local.id);
+
+    if (!error) {
+      setDeclarations(declarations.map(d => d.id === local.id ? { ...local, status: nextStatus } : d));
+      updateLocal({ status: nextStatus });
+    } else {
+      console.error('Error toggling status:', error);
+    }
+    setIsProcessing(false);
   };
 
   return (
@@ -234,6 +304,7 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
                   setLocal({ ...record, documents: [...(record.documents || [])] });
                   setIsEditing(false);
                 }}
+                disabled={isProcessing}
                 style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
               >
                 Cancel
@@ -241,10 +312,8 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
 
               {/* Save */}
               <button
-                onClick={() => {
-                  handleSave();
-                  setIsEditing(false);
-                }}
+                onClick={handleSave}
+                disabled={isProcessing}
                 style={{
                   flex: 1, padding: '11px 0', borderRadius: 10,
                   background: saved ? 'rgba(255,255,255,0.18)' : '#f5f5f5',
@@ -255,7 +324,7 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
                 }}
               >
-                {saved ? '✓ Saved!' : 'Save'}
+                {saved ? '✓ Saved!' : isProcessing ? 'Saving...' : 'Save'}
               </button>
             </>
           ) : (
@@ -263,28 +332,19 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
               {/* Pay or Toggle */}
               {local.paymentStatus === 'unpaid' ? (
                 <button
-                  onClick={() => {
-                    const newDocs = [...local.documents, { name: 'Customs Fee Receipt', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }];
-                    setDeclarations(declarations.map(d => d.id === local.id ? { ...local, paymentStatus: 'paid', status: 'received', documents: newDocs } : d));
-                    updateLocal({
-                      paymentStatus: 'paid', status: 'received',
-                      documents: newDocs
-                    });
-                  }}
+                  onClick={handlePayFees}
+                  disabled={isProcessing}
                   style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
                 >
-                  Pay Fees &amp; Release
+                  {isProcessing ? 'Processing...' : 'Pay Fees & Release'}
                 </button>
               ) : (
                 <button
-                  onClick={() => {
-                    const nextStatus = local.status === 'received' ? 'rejected' : 'received';
-                    setDeclarations(declarations.map(d => d.id === local.id ? { ...local, status: nextStatus } : d));
-                    updateLocal({ status: nextStatus });
-                  }}
+                  onClick={handleToggleStatus}
+                  disabled={isProcessing}
                   style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
                 >
-                  Toggle Status ({local.status === 'received' ? 'Reject' : 'Receive'})
+                  {isProcessing ? 'Updating...' : `Toggle Status (${local.status === 'received' ? 'Reject' : 'Receive'})`}
                 </button>
               )}
 
@@ -320,6 +380,24 @@ const CustomPage = ({ declarations, setDeclarations }) => {
   const [search, setSearch]           = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected]       = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetchDeclarations();
+  }, []);
+
+  const fetchDeclarations = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('declarations').select('*');
+    if (!error && data) {
+      setDeclarations(data);
+    } else {
+      console.error('Error fetching declarations:', error);
+    }
+    setIsLoading(false);
+  };
+
+  const dynamicStats = getStats(declarations);
 
   const filtered = declarations.filter(d => {
     const matchSearch = !search
@@ -350,13 +428,15 @@ const CustomPage = ({ declarations, setDeclarations }) => {
           <p className="page-subtitle">Manage import/export declarations and clearance status</p>
         </div>
         <div className="header-actions">
-          <button className="btn"><Download size={16} /> Export</button>
+          <button className="btn" onClick={fetchDeclarations} disabled={isLoading}>
+            {isLoading ? 'Syncing...' : <><Download size={16} /> Sync</>}
+          </button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginBottom: 28 }}>
-        {stats.map((s, i) => {
+        {dynamicStats.map((s, i) => {
           const Icon = s.icon;
           return (
             <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="stat-card">
