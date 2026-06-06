@@ -4,6 +4,7 @@ import {
   Search, MapPin, Box, User, CheckCircle2,
   XCircle, Warehouse, AlertTriangle, Layers, Loader2, Info, ArrowRight, Clock
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const StatusBadge = ({ status }) => {
   return (
@@ -26,11 +27,27 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const StorageModule = ({ warehouses, setWarehouses, deals }) => {
+const StorageModule = () => {
+  const [warehouses, setWarehouses] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedWH, setSelectedWH] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  React.useEffect(() => {
+    fetchWarehouses();
+  }, []);
+
+  const fetchWarehouses = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('warehouses').select('*');
+    if (error) {
+      console.error('Error fetching warehouses:', error);
+    } else {
+      setWarehouses(data || []);
+    }
+    setIsLoading(false);
+  };
 
   const totalWarehouses = warehouses.length;
   const totalCapacity = warehouses.reduce((sum, wh) => sum + wh.capacity, 0);
@@ -76,7 +93,104 @@ const StorageModule = ({ warehouses, setWarehouses, deals }) => {
     setSortConfig({ key, direction });
   };
 
-  const expectedDeals = (deals || []);
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    const formData = new FormData(e.target);
+    const capacity = parseFloat(formData.get('capacity'));
+    const occupiedSpace = parseFloat(formData.get('occupiedSpace'));
+    const availableSpace = capacity - occupiedSpace;
+
+    if (editingWH) {
+      const updatedWH = {
+        name: formData.get('name'),
+        location: formData.get('location'),
+        capacity,
+        occupiedSpace,
+        availableSpace,
+        type: formData.get('type'),
+        manager: formData.get('manager'),
+        contact: formData.get('contact'),
+        status: formData.get('status'),
+      };
+      
+      const { error } = await supabase
+        .from('warehouses')
+        .update(updatedWH)
+        .eq('id', editingWH.id);
+
+      if (error) {
+        console.error('Error updating warehouse:', error);
+      } else {
+        await fetchWarehouses();
+      }
+    } else {
+      const newWH = {
+        name: formData.get('name'),
+        location: formData.get('location'),
+        capacity,
+        occupiedSpace,
+        availableSpace,
+        type: formData.get('type'),
+        manager: formData.get('manager'),
+        contact: formData.get('contact'),
+        status: formData.get('status'),
+        createdDate: new Date().toISOString().split('T')[0],
+      };
+      
+      const { error } = await supabase
+        .from('warehouses')
+        .insert([newWH]);
+
+      if (error) {
+        console.error('Error creating warehouse:', error);
+      } else {
+        await fetchWarehouses();
+      }
+    }
+    
+    setIsFormOpen(false);
+    setIsLoading(false);
+  };
+
+  const handleDelete = async (id) => {
+    setIsLoading(true);
+    const { error } = await supabase
+      .from('warehouses')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting warehouse:', error);
+    } else {
+      await fetchWarehouses();
+      setSelectedWH(null);
+    }
+    setIsLoading(false);
+  };
+
+  const handleExport = () => {
+    const headers = ['Storage ID', 'Warehouse Name', 'Location', 'Capacity', 'Available Space', 'Occupied Space', 'Type', 'Manager', 'Contact', 'Status', 'Created Date'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredWarehouses.map(wh => [
+        wh.id, `"${wh.name}"`, `"${wh.location}"`, wh.capacity, wh.availableSpace, wh.occupiedSpace, wh.type, `"${wh.manager}"`, `"${wh.contact}"`, wh.status, wh.createdDate
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", "storage_export.csv");
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   return (
     <motion.div

@@ -4,9 +4,21 @@ import {
   Search, Plus, Eye, Edit2, Trash2, X, FileText,
   Phone, MapPin, Calendar, DollarSign, Briefcase, Archive, AlertTriangle, Truck
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
-const DealModule = ({ deals, setDeals }) => {
-  const [searchTerm, setSearchTerm] = useState('');
+const mockDeals = [];
+
+const StatusBadge = ({ status }) => {
+  const getStatusStyles = () => {
+    switch (status) {
+      case 'New': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: Clock };
+      case 'Pending': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: Clock };
+      case 'In Progress': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: Truck };
+      case 'Completed': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: CheckCircle2 };
+      case 'Cancelled': return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: XCircle };
+      default: return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: FileText };
+    }
+  };
   
   // Modals state
   const [viewDeal, setViewDeal] = useState(null);
@@ -14,20 +26,44 @@ const DealModule = ({ deals, setDeals }) => {
   const [editDeal, setEditDeal] = useState(null);
   const [dealToDelete, setDealToDelete] = useState(null);
 
-  // Form input state (with Status, Fleet & Driver, and Warehouse Assignment removed)
-  const [formData, setFormData] = useState({
-    title: '',
-    customerName: '',
-    customerPhone: '',
-    pickupLocation: '',
-    deliveryLocation: '',
-    cargoType: '',
-    orderedQuantity: '',
-    shippedQuantity: '',
-    price: '',
-    pickupDate: '',
-    deliveryDate: '',
-    notes: ''
+const DealModule = () => {
+  const [deals, setDeals] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [selectedDeal, setSelectedDeal] = useState(null);
+  const [isNewDealOpen, setIsNewDealOpen] = useState(false);
+  const [editingDeal, setEditingDeal] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+  React.useEffect(() => {
+    fetchDeals();
+  }, []);
+
+  const fetchDeals = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('deals').select('*');
+    if (error) {
+      console.error('Error fetching deals:', error);
+    } else {
+      setDeals(data || []);
+    }
+    setIsLoading(false);
+  };
+
+  const stats = [
+    { title: 'Total Deals', value: '1,284', trend: '+12%', icon: Handshake, isUp: true },
+    { title: 'Active Deals', value: '42', trend: '+5%', icon: Truck, isUp: true },
+    { title: 'Completed', value: '1,190', trend: '+18%', icon: CheckCircle2, isUp: true },
+    { title: 'Revenue', value: '$1.4M', trend: '+24%', icon: DollarSign, isUp: true },
+  ];
+
+  let filteredDeals = deals.filter(deal => {
+    const matchesSearch = deal.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          deal.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          deal.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'All' || deal.status === filterStatus;
+    return matchesSearch && matchesStatus;
   });
 
   // Calculate Dashboard statistics
@@ -380,10 +416,29 @@ const DealModule = ({ deals, setDeals }) => {
                 </p>
               </div>
 
-              {/* Modal Actions */}
-              <div style={{ display: 'flex', gap: '12px', marginTop: '28px', justifyContent: 'flex-end' }}>
-                <button className="btn" style={{ color: 'var(--text-muted)' }} onClick={(e) => { setViewDeal(null); triggerDeleteConfirm(viewDeal, e); }}>
-                  Delete Deal
+              {selectedDeal.notes && (
+                <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                  <h3 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '8px' }}>Notes</h3>
+                  <p style={{ fontSize: '14px', lineHeight: '1.5' }}>{selectedDeal.notes}</p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
+                <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={async () => {
+                  setIsLoading(true);
+                  const { error } = await supabase
+                    .from('deals')
+                    .delete()
+                    .eq('id', selectedDeal.id);
+                  if (error) {
+                    console.error('Error deleting deal:', error);
+                  } else {
+                    await fetchDeals();
+                    setSelectedDeal(null);
+                  }
+                  setIsLoading(false);
+                }}>
+                  <Trash2 size={16} /> Delete
                 </button>
                 <button className="btn btn-primary" onClick={(e) => { setViewDeal(null); handleOpenEditModal(viewDeal, e); }}>
                   Edit Deal
@@ -481,14 +536,64 @@ const DealModule = ({ deals, setDeals }) => {
                 <X size={20} />
               </button>
 
-              <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 24px 0', color: '#fff' }}>
-                {editDeal ? `Edit Deal ${editDeal.id}` : 'Create Logistics Deal'}
-              </h2>
-
-              <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {/* Section 1: General Info */}
-                <div>
-                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>General Details</h3>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                
+                const formData = new FormData(e.target);
+                
+                if (editingDeal) {
+                  const updatedDeal = {
+                    title: formData.get('title'),
+                    customerName: formData.get('customerName'),
+                    pickupLocation: formData.get('pickupLocation'),
+                    deliveryLocation: formData.get('deliveryLocation'),
+                    cargoType: formData.get('cargoType'),
+                    cargoWeight: formData.get('cargoWeight'),
+                    vehicleType: formData.get('vehicleType'),
+                    price: parseFloat(formData.get('price')),
+                  };
+                  
+                  const { error } = await supabase
+                    .from('deals')
+                    .update(updatedDeal)
+                    .eq('id', editingDeal.id);
+                    
+                  if (error) console.error('Error updating deal:', error);
+                  else await fetchDeals();
+                } else {
+                  const newDeal = {
+                    title: formData.get('title'),
+                    customerName: formData.get('customerName'),
+                    pickupLocation: formData.get('pickupLocation'),
+                    deliveryLocation: formData.get('deliveryLocation'),
+                    cargoType: formData.get('cargoType'),
+                    cargoWeight: formData.get('cargoWeight'),
+                    vehicleType: formData.get('vehicleType'),
+                    price: parseFloat(formData.get('price')),
+                    driverInfo: 'Pending',
+                    pickupDate: new Date().toISOString().split('T')[0],
+                    deliveryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+                    status: 'New',
+                    notes: '',
+                  };
+                  
+                  const { error } = await supabase
+                    .from('deals')
+                    .insert([newDeal]);
+                    
+                  if (error) console.error('Error creating deal:', error);
+                  else await fetchDeals();
+                }
+                
+                setIsNewDealOpen(false);
+                setIsLoading(false);
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Deal Title</label>
+                    <input type="text" name="title" defaultValue={editingDeal?.title || ''} placeholder="e.g. Electronics to Seattle Hub" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
+                  </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Deal Title / Description</label>
                     <input
