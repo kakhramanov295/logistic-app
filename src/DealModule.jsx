@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, Eye, Edit2, Trash2, X, FileText,
-  Phone, MapPin, Calendar, DollarSign, Briefcase, Archive, AlertTriangle, Truck
+  Phone, MapPin, Calendar, DollarSign, Briefcase, Archive, AlertTriangle, Truck,
+  Clock, CheckCircle2, XCircle, Handshake
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -19,14 +20,20 @@ const StatusBadge = ({ status }) => {
       default: return { bg: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)', icon: FileText };
     }
   };
-  
-  // Modals state
+  const styles = getStatusStyles();
+  const Icon = styles.icon;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, backgroundColor: styles.bg, color: styles.color }}>
+      <Icon size={12} /> {status}
+    </span>
+  );
+};
+
+const DealModule = () => {
   const [viewDeal, setViewDeal] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editDeal, setEditDeal] = useState(null);
   const [dealToDelete, setDealToDelete] = useState(null);
-
-const DealModule = () => {
   const [deals, setDeals] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
@@ -35,6 +42,11 @@ const DealModule = () => {
   const [editingDeal, setEditingDeal] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [formData, setFormData] = useState({
+    title: '', customerName: '', customerPhone: '', pickupLocation: '',
+    deliveryLocation: '', cargoType: '', orderedQuantity: '', shippedQuantity: '',
+    price: '', pickupDate: '', deliveryDate: '', notes: ''
+  });
 
   React.useEffect(() => {
     fetchDeals();
@@ -51,20 +63,7 @@ const DealModule = () => {
     setIsLoading(false);
   };
 
-  const stats = [
-    { title: 'Total Deals', value: '1,284', trend: '+12%', icon: Handshake, isUp: true },
-    { title: 'Active Deals', value: '42', trend: '+5%', icon: Truck, isUp: true },
-    { title: 'Completed', value: '1,190', trend: '+18%', icon: CheckCircle2, isUp: true },
-    { title: 'Revenue', value: '$1.4M', trend: '+24%', icon: DollarSign, isUp: true },
-  ];
 
-  let filteredDeals = deals.filter(deal => {
-    const matchesSearch = deal.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          deal.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          deal.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || deal.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
 
   // Calculate Dashboard statistics
   const totalDeals = deals.length;
@@ -416,12 +415,7 @@ const DealModule = () => {
                 </p>
               </div>
 
-              {selectedDeal.notes && (
-                <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--border)' }}>
-                  <h3 style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '8px' }}>Notes</h3>
-                  <p style={{ fontSize: '14px', lineHeight: '1.5' }}>{selectedDeal.notes}</p>
-                </div>
-              )}
+
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
                 <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={async () => {
@@ -429,12 +423,12 @@ const DealModule = () => {
                   const { error } = await supabase
                     .from('deals')
                     .delete()
-                    .eq('id', selectedDeal.id);
+                    .eq('id', viewDeal.id);
                   if (error) {
                     console.error('Error deleting deal:', error);
                   } else {
                     await fetchDeals();
-                    setSelectedDeal(null);
+                    setViewDeal(null);
                   }
                   setIsLoading(false);
                 }}>
