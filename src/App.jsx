@@ -10,6 +10,7 @@ import LoginPage from './LoginPage';
 import ProfilePage from './ProfilePage';
 import UsersPage from './UsersPage';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 const SUPABASE_URL = "https://vcjyiihovljzkcpsxpwz.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_NemRADDZEtihhs7fCJ5acA_8h0jVARB";
@@ -85,13 +86,28 @@ const PlaceholderPage = ({ title }) => (
 );
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const location = useLocation();
   const [deals, setDeals] = useState(INITIAL_DEALS);
   const [warehouses, setWarehouses] = useState(INITIAL_WAREHOUSES);
   const [declarations, setDeclarations] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('logistic_app_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [appLoading, setAppLoading] = useState(true);
   const pollRef = useRef(null);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('logistic_app_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('logistic_app_user');
+    }
+  }, [currentUser]);
 
   // Show loading screen briefly on initial mount
   useEffect(() => {
@@ -135,35 +151,6 @@ function App() {
     pollRef.current = setInterval(checkBlock, 10000);
     return () => clearInterval(pollRef.current);
   }, [currentUser?.id]);
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard key="dashboard" />;
-      case 'application':
-        return <ApplicationModule key="application" />;
-      case 'deal':
-        return <DealModule key="deal" deals={deals} setDeals={setDeals} warehouses={warehouses} />;
-      case 'storage':
-        return <StorageModule key="storage" warehouses={warehouses} setWarehouses={setWarehouses} deals={deals} />;
-      case 'custom':
-        return <CustomPage key="custom" declarations={declarations} setDeclarations={setDeclarations} />;
-      case 'acceptance':
-        return <AcceptancePage key="acceptance" />;
-      case 'profile':
-        if (currentUser && currentUser.role === 'Admin') {
-          return <ProfilePage key="profile" currentUser={currentUser} setCurrentUser={setCurrentUser} />;
-        }
-        return <Dashboard key="dashboard" />;
-      case 'users':
-        if (currentUser && currentUser.role === 'Admin') {
-          return <UsersPage key="users" currentUser={currentUser} />;
-        }
-        return <Dashboard key="dashboard" />;
-      default:
-        return <Dashboard key="dashboard" />;
-    }
-  };
 
   if (appLoading) {
     return (
@@ -258,9 +245,34 @@ function App() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
     >
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} />
+      <Sidebar currentUser={currentUser} onLogout={handleLogout} />
       <AnimatePresence mode="wait">
-        {renderContent()}
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/application" element={<ApplicationModule />} />
+          <Route path="/deal" element={<DealModule deals={deals} setDeals={setDeals} warehouses={warehouses} />} />
+          <Route path="/storage" element={<StorageModule warehouses={warehouses} setWarehouses={setWarehouses} deals={deals} />} />
+          <Route path="/custom" element={<CustomPage declarations={declarations} setDeclarations={setDeclarations} />} />
+          <Route path="/acceptance" element={<AcceptancePage />} />
+          <Route 
+            path="/profile" 
+            element={
+              currentUser && currentUser.role === 'Admin' 
+                ? <ProfilePage currentUser={currentUser} setCurrentUser={setCurrentUser} /> 
+                : <Navigate to="/dashboard" replace />
+            } 
+          />
+          <Route 
+            path="/users" 
+            element={
+              currentUser && currentUser.role === 'Admin' 
+                ? <UsersPage currentUser={currentUser} /> 
+                : <Navigate to="/dashboard" replace />
+            } 
+          />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </AnimatePresence>
     </motion.div>
   );

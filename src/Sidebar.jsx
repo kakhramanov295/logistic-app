@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   AppWindow, 
@@ -12,18 +13,22 @@ import {
   Users
 } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab, currentUser, onLogout }) => {
+const Sidebar = ({ currentUser, onLogout }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   const baseMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'application', label: 'Application', icon: AppWindow },
-    { id: 'deal', label: 'Deal', icon: Handshake },
-    { id: 'storage', label: 'Storage', icon: Box },
-    { id: 'custom', label: 'Custom', icon: Settings2 },
-    { id: 'acceptance', label: 'Acceptance', icon: CheckCircle2 },
+    { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: '/application', label: 'Application', icon: AppWindow },
+    { id: '/deal', label: 'Deal', icon: Handshake },
+    { id: '/storage', label: 'Storage', icon: Box },
+    { id: '/custom', label: 'Custom', icon: Settings2 },
+    { id: '/acceptance', label: 'Acceptance', icon: CheckCircle2 },
   ];
 
   const menuItems = currentUser && currentUser.role === 'Admin'
-    ? [...baseMenuItems, { id: 'users', label: 'Users', icon: Users }]
+    ? [...baseMenuItems, { id: '/users', label: 'Users', icon: Users }]
     : baseMenuItems;
 
   const initials = currentUser
@@ -45,7 +50,7 @@ const Sidebar = ({ activeTab, setActiveTab, currentUser, onLogout }) => {
       <ul className="nav-menu">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isActive = currentPath === item.id || (currentPath === '/' && item.id === '/dashboard');
           return (
             <motion.li 
               key={item.id}
@@ -56,7 +61,7 @@ const Sidebar = ({ activeTab, setActiveTab, currentUser, onLogout }) => {
                 className={`nav-item ${isActive ? 'active' : ''}`}
                 onClick={(e) => {
                   e.preventDefault();
-                  setActiveTab(item.id);
+                  navigate(item.id);
                 }}
               >
                 <Icon size={20} />
@@ -70,8 +75,8 @@ const Sidebar = ({ activeTab, setActiveTab, currentUser, onLogout }) => {
       {/* User profile + logout for ADMIN */}
       {currentUser && currentUser.role === 'Admin' && (
         <div 
-          className={`sidebar-user ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
+          className={`sidebar-user ${currentPath === '/profile' ? 'active' : ''}`}
+          onClick={() => navigate('/profile')}
           style={{ cursor: 'pointer' }}
         >
           <div className="sidebar-user-info">
@@ -84,7 +89,7 @@ const Sidebar = ({ activeTab, setActiveTab, currentUser, onLogout }) => {
           <motion.button
             className="sidebar-logout-btn"
             onClick={(e) => {
-              e.stopPropagation(); // prevent triggering activeTab switch
+              e.stopPropagation(); // prevent triggering profile navigation
               onLogout();
             }}
             whileHover={{ scale: 1.05 }}
