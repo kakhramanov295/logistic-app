@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Plus, CheckCircle2, Clock, MapPin, Tag, Hash, PackageOpen, X, FileText, Trash2, ArrowRight, CircleDollarSign
+  Plus, CheckCircle2, Clock, MapPin, Tag, Hash, PackageOpen, X, FileText, Trash2, ArrowRight, CircleDollarSign, Pencil
 } from 'lucide-react';
 
 const ApplicationModule = () => {
@@ -38,6 +38,7 @@ const ApplicationModule = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, actionType: null, orderId: null });
+  const [editModal, setEditModal] = useState({ isOpen: false, order: null });
   const [newOrder, setNewOrder] = useState({
     type: 'Standard',
     contents: '',
@@ -61,6 +62,16 @@ const ApplicationModule = () => {
     setOrders([orderToAdd, ...orders]);
     setIsModalOpen(false);
     setNewOrder({ type: 'Standard', contents: '', quantity: '', weight: '', origin: '', destination: '', value: '', description: '' });
+  };
+
+  const openEditModal = (order) => {
+    setEditModal({ isOpen: true, order: { ...order } });
+  };
+
+  const handleEditOrder = (e) => {
+    e.preventDefault();
+    setOrders(orders.map(o => o.id === editModal.order.id ? { ...editModal.order } : o));
+    setEditModal({ isOpen: false, order: null });
   };
 
   const confirmAction = () => {
@@ -179,6 +190,14 @@ const ApplicationModule = () => {
                     Processed
                   </div>
                 )}
+                <button 
+                  className="btn" 
+                  onClick={() => openEditModal(order)}
+                  style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--text-main)', padding: '10px' }}
+                  title="Edit Order"
+                >
+                  <Pencil size={16} />
+                </button>
                 <button 
                   className="btn" 
                   onClick={() => setConfirmModal({ isOpen: true, actionType: 'delete', orderId: order.id })}
@@ -325,6 +344,133 @@ const ApplicationModule = () => {
                 <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
                   <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
                   <button type="submit" className="btn btn-primary">Create Order</button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Order Modal */}
+      <AnimatePresence>
+        {editModal.isOpen && editModal.order && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="modal-content panel"
+            >
+              <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 600 }}>Edit Order — {editModal.order.id}</h2>
+                <button type="button" className="icon-btn" onClick={() => setEditModal({ isOpen: false, order: null })} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <form onSubmit={handleEditOrder} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="form-group">
+                  <label>Cargo Contents</label>
+                  <input 
+                    type="text" 
+                    className="form-control"
+                    required
+                    value={editModal.order.contents}
+                    onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, contents: e.target.value } })}
+                  />
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>Cargo Type</label>
+                    <select 
+                      className="form-control"
+                      value={editModal.order.type}
+                      onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, type: e.target.value } })}
+                    >
+                      <option value="Standard">Standard</option>
+                      <option value="Express">Express</option>
+                      <option value="Fragile">Fragile</option>
+                      <option value="Heavy">Heavy Duty</option>
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Quantity</label>
+                    <input 
+                      type="number" 
+                      className="form-control"
+                      required
+                      min="1"
+                      value={editModal.order.quantity}
+                      onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, quantity: e.target.value } })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>Origin</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      required
+                      value={editModal.order.origin}
+                      onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, origin: e.target.value } })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Destination</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      required
+                      value={editModal.order.destination}
+                      onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, destination: e.target.value } })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>Total Weight</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      value={editModal.order.weight}
+                      onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, weight: e.target.value } })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Est. Value</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      value={editModal.order.value}
+                      onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, value: e.target.value } })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea 
+                    className="form-control"
+                    rows="2"
+                    value={editModal.order.description}
+                    onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, description: e.target.value } })}
+                    style={{ resize: 'vertical' }}
+                  ></textarea>
+                </div>
+
+                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                  <button type="button" className="btn" onClick={() => setEditModal({ isOpen: false, order: null })}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">Save Changes</button>
                 </div>
               </form>
             </motion.div>
