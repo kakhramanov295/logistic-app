@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Plus, CheckCircle2, Clock, MapPin, Tag, Hash, PackageOpen, X, FileText, Trash2, ArrowRight, CircleDollarSign, Pencil, Loader2
+  Plus, CheckCircle2, Clock, MapPin, Tag, Hash, PackageOpen, X, FileText, Trash2, ArrowRight, CircleDollarSign, Pencil, Loader2, Calculator
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -21,8 +21,27 @@ const ApplicationModule = () => {
     origin: '',
     destination: '',
     value: '',
+    taxSystem: 'None',
+    taxRate: '',
     description: ''
   });
+
+  const calculateFinancials = (revStr, taxSystem, taxRate) => {
+    const rev = parseFloat(String(revStr || '').replace(/[^0-9.-]+/g, "")) || 0;
+    const rate = parseFloat(taxRate) || 0;
+    
+    let taxAmount = 0;
+    
+    if (taxSystem === 'VAT (on Revenue)') {
+      taxAmount = rev * (rate / 100);
+    } else if (taxSystem === 'Income Tax (on Profit)') {
+      taxAmount = rev > 0 ? rev * (rate / 100) : 0;
+    }
+    
+    const netProfit = rev - taxAmount;
+    
+    return { rev, taxAmount, netProfit };
+  };
 
   // Fetch orders from Supabase on mount
   const fetchOrders = async () => {
@@ -55,6 +74,8 @@ const ApplicationModule = () => {
       origin: newOrder.origin,
       destination: newOrder.destination,
       value: newOrder.value,
+      tax_system: newOrder.taxSystem,
+      tax_rate: newOrder.taxRate ? Number(newOrder.taxRate) : null,
       description: newOrder.description,
       status: 'Pending',
       date: new Date().toISOString().split('T')[0]
@@ -63,16 +84,24 @@ const ApplicationModule = () => {
     const { error } = await supabase.from('applications').insert([orderToAdd]);
     if (error) {
       console.error('Error creating order:', error);
+      alert('Ошибка базы данных (Supabase): ' + error.message + '\n\nУбедитесь, что вы добавили новые колонки (tax_system, tax_rate) в таблицу applications!');
     } else {
       await fetchOrders();
       setIsModalOpen(false);
-      setNewOrder({ type: 'Standard', contents: '', quantity: '', weight: '', origin: '', destination: '', value: '', description: '' });
+      setNewOrder({ type: 'Standard', contents: '', quantity: '', weight: '', origin: '', destination: '', value: '', taxSystem: 'None', taxRate: '', description: '' });
     }
     setIsSaving(false);
   };
 
   const openEditModal = (order) => {
-    setEditModal({ isOpen: true, order: { ...order } });
+    setEditModal({ 
+      isOpen: true, 
+      order: { 
+        ...order,
+        tax_system: order.tax_system || 'None',
+        tax_rate: order.tax_rate || ''
+      } 
+    });
   };
 
   // Update order in Supabase
@@ -87,6 +116,7 @@ const ApplicationModule = () => {
       .eq('id', id);
     if (error) {
       console.error('Error updating order:', error);
+      alert('Ошибка базы данных (Supabase): ' + error.message + '\n\nУбедитесь, что вы добавили новые колонки (tax_system, tax_rate) в таблицу applications!');
     } else {
       await fetchOrders();
       setEditModal({ isOpen: false, order: null });
@@ -180,7 +210,7 @@ const ApplicationModule = () => {
                   <th>Order Info</th>
                   <th>Route (Origin ➔ Destination)</th>
                   <th>Cargo Details</th>
-                  <th>Est. Value</th>
+                  <th>Financials (Net Profit)</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
@@ -208,12 +238,31 @@ const ApplicationModule = () => {
                           Type: {order.type} | Qty: {order.quantity} {order.weight ? `| Wt: ${order.weight}` : ''}
                         </div>
                       </td>
-                      <td style={{ fontWeight: 600 }}>
-                        {order.value ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                             <CircleDollarSign size={14} style={{ color: 'var(--text-muted)' }} /> {order.value}
-                          </div>
-                        ) : 'N/A'}
+                      <td>
+                        {(() => {
+                          if (!order.value) return <span style={{ fontWeight: 600 }}>N/A</span>;
+                          const fin = calculateFinancials(order.value, order.tax_system, order.tax_rate);
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                                 <CircleDollarSign size={14} style={{ color: 'var(--text-muted)' }} /> Rev: ${fin.rev.toLocaleString()}
+                              </div>
+                              {order.tax_system && order.tax_system !== 'None' && (
+                                <div style={{ fontSize: '11px', color: '#ff4d4f' }}>
+                                  Tax ({order.tax_system}): -${fin.taxAmount.toLocaleString()}
+                                </div>
+                              )}
+                              <div style={{ 
+                                fontSize: '12px', 
+                                fontWeight: 700, 
+                                color: fin.netProfit >= 0 ? '#4ade80' : '#ff4d4f',
+                                marginTop: '2px'
+                              }}>
+                                Net: ${fin.netProfit.toLocaleString()}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>{getStatusBadge(order.status)}</td>
                       <td>
@@ -370,16 +419,70 @@ const ApplicationModule = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Est. Value (optional)</label>
+                    <label>Revenue / Est. Value</label>
                     <input 
-                      type="text" 
+                      type="number" 
                       className="form-control"
-                      placeholder="e.g. $5,000"
+                      placeholder="e.g. 5000"
                       value={newOrder.value}
                       onChange={(e) => setNewOrder({...newOrder, value: e.target.value})}
                     />
                   </div>
                 </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>Tax System</label>
+                    <select 
+                      className="form-control"
+                      value={newOrder.taxSystem}
+                      onChange={(e) => setNewOrder({...newOrder, taxSystem: e.target.value})}
+                    >
+                      <option value="None">No Tax</option>
+                      <option value="VAT (on Revenue)">VAT (on Revenue)</option>
+                      <option value="Income Tax (on Profit)">Income Tax (on Profit)</option>
+                    </select>
+                  </div>
+                  {newOrder.taxSystem !== 'None' && (
+                    <div className="form-group">
+                      <label>Tax Rate (%)</label>
+                      <input 
+                        type="number" 
+                        className="form-control"
+                        placeholder="e.g. 20"
+                        value={newOrder.taxRate}
+                        onChange={(e) => setNewOrder({...newOrder, taxRate: e.target.value})}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {newOrder.value ? (() => {
+                   const fin = calculateFinancials(newOrder.value, newOrder.taxSystem, newOrder.taxRate);
+                   return (
+                     <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '13px', border: '1px solid var(--border)' }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}>
+                         <Calculator size={14} /> Financial Summary
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                         <span style={{ color: 'var(--text-muted)' }}>Gross Profit (Before Tax):</span>
+                         <span style={{ fontWeight: 500 }}>${fin.rev.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                       </div>
+                       {newOrder.taxSystem !== 'None' && (
+                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                           <span style={{ color: 'var(--text-muted)' }}>Tax Deduction:</span>
+                           <span style={{ color: '#ff4d4f', fontWeight: 500 }}>-${fin.taxAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                         </div>
+                       )}
+                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                         <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Net Profit (After Tax):</span>
+                         <span style={{ color: fin.netProfit >= 0 ? '#4ade80' : '#ff4d4f', fontWeight: 700 }}>
+                           ${fin.netProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                         </span>
+                       </div>
+                     </div>
+                   );
+                })() : null}
 
                 <div className="form-group">
                   <label>Description (optional)</label>
@@ -501,15 +604,68 @@ const ApplicationModule = () => {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Est. Value</label>
+                    <label>Revenue</label>
                     <input 
-                      type="text" 
+                      type="number" 
                       className="form-control"
                       value={editModal.order.value}
                       onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, value: e.target.value } })}
                     />
                   </div>
                 </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>Tax System</label>
+                    <select 
+                      className="form-control"
+                      value={editModal.order.tax_system}
+                      onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, tax_system: e.target.value } })}
+                    >
+                      <option value="None">No Tax</option>
+                      <option value="VAT (on Revenue)">VAT (on Revenue)</option>
+                      <option value="Income Tax (on Profit)">Income Tax (on Profit)</option>
+                    </select>
+                  </div>
+                  {editModal.order.tax_system !== 'None' && (
+                    <div className="form-group">
+                      <label>Tax Rate (%)</label>
+                      <input 
+                        type="number" 
+                        className="form-control"
+                        value={editModal.order.tax_rate}
+                        onChange={(e) => setEditModal({ ...editModal, order: { ...editModal.order, tax_rate: e.target.value } })}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {editModal.order.value ? (() => {
+                   const fin = calculateFinancials(editModal.order.value, editModal.order.tax_system, editModal.order.tax_rate);
+                   return (
+                     <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '13px', border: '1px solid var(--border)' }}>
+                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--text-main)', fontWeight: 600 }}>
+                         <Calculator size={14} /> Financial Summary
+                       </div>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                         <span style={{ color: 'var(--text-muted)' }}>Gross Profit (Before Tax):</span>
+                         <span style={{ fontWeight: 500 }}>${fin.rev.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                       </div>
+                       {editModal.order.tax_system !== 'None' && (
+                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                           <span style={{ color: 'var(--text-muted)' }}>Tax Deduction:</span>
+                           <span style={{ color: '#ff4d4f', fontWeight: 500 }}>-${fin.taxAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                         </div>
+                       )}
+                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                         <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>Net Profit (After Tax):</span>
+                         <span style={{ color: fin.netProfit >= 0 ? '#4ade80' : '#ff4d4f', fontWeight: 700 }}>
+                           ${fin.netProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                         </span>
+                       </div>
+                     </div>
+                   );
+                })() : null}
 
                 <div className="form-group">
                   <label>Description</label>
