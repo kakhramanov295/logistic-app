@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Plus, Filter, MoreVertical, 
-  MapPin, Box, User, Phone, CheckCircle2, 
-  XCircle, Warehouse, AlertTriangle, Layers, Trash2, Edit2, Loader2, Info, Download
+import {
+  Search, MapPin, Box, User, CheckCircle2,
+  XCircle, Warehouse, AlertTriangle, Layers, Loader2, Info, ArrowRight, Clock
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
-
-const mockStorage = [];
 
 const StatusBadge = ({ status }) => {
   return (
@@ -15,7 +12,6 @@ const StatusBadge = ({ status }) => {
       display: 'inline-flex',
       alignItems: 'center',
       gap: '6px',
-      padding: '6px 12px',
       borderRadius: '20px',
       backgroundColor: 'rgba(255, 255, 255, 0.05)',
       color: 'var(--text-main)',
@@ -36,12 +32,7 @@ const StorageModule = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [selectedWH, setSelectedWH] = useState(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingWH, setEditingWH] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [selectedFormStatus, setSelectedFormStatus] = useState('Active');
 
   React.useEffect(() => {
     fetchWarehouses();
@@ -71,9 +62,9 @@ const StorageModule = () => {
   ];
 
   let filteredWarehouses = warehouses.filter(wh => {
-    const matchesSearch = wh.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          wh.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          wh.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = wh.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      wh.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      wh.id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'All' || wh.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -202,7 +193,7 @@ const StorageModule = () => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -239,9 +230,9 @@ const StorageModule = () => {
         <div className="deals-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', alignItems: 'center' }}>
           <div className="search-bar" style={{ position: 'relative', width: '300px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              placeholder="Search warehouses..." 
+            <input
+              type="text"
+              placeholder="Search warehouses..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
@@ -258,7 +249,7 @@ const StorageModule = () => {
           </div>
           <div className="filter-group" style={{ display: 'flex', gap: '8px' }}>
             {['All', 'Active', 'Full', 'Maintenance', 'Inactive'].map(status => (
-              <button 
+              <button
                 key={status}
                 onClick={() => setFilterStatus(status)}
                 style={{
@@ -321,9 +312,6 @@ const StorageModule = () => {
                       <button className="btn" style={{ padding: '6px' }} onClick={(e) => { e.stopPropagation(); setSelectedWH(wh); }}>
                         <Info size={16} />
                       </button>
-                      <button className="btn" style={{ padding: '6px' }} onClick={(e) => { e.stopPropagation(); setEditingWH(wh); setIsFormOpen(true); }}>
-                        <Edit2 size={16} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -338,9 +326,64 @@ const StorageModule = () => {
         </div>
       </div>
 
+      {/* "Kutilyapti" Table Panel */}
+      <div className="panel deals-panel" style={{ marginTop: '32px' }}>
+        <h2 className="panel-header" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Clock size={20} /> Kutilyapti (Kutilayotgan yuklar / Expected Shipments)
+        </h2>
+        <div className="table-container">
+          <table className="deals-table">
+            <thead>
+              <tr>
+                <th>Deal ID</th>
+                <th>Buyurtmachi (Customer)</th>
+                <th>Yuk turi (Cargo Type)</th>
+                <th>Buyurtma / Jo'natilgan (Ordered / Shipped)</th>
+                <th>Belgilangan Ombor (Warehouse)</th>
+                <th>Yo'nalish (Route)</th>
+                <th>Holat (Status)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expectedDeals.map(deal => {
+                const whName = warehouses.find(w => w.id === deal.assignedWarehouseId)?.name || 'Tayinlanmagan';
+                return (
+                  <tr key={deal.id}>
+                    <td style={{ fontWeight: 600 }}>{deal.id}</td>
+                    <td style={{ fontWeight: 500 }}>{deal.customerName}</td>
+                    <td>{deal.cargoType}</td>
+                    <td>
+                      Ordered: {deal.orderedQuantity || 0} / Shipped: {deal.shippedQuantity || 0}
+                    </td>
+                    <td style={{ color: '#60a5fa', fontWeight: 500 }}>{whName}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                        <span>{deal.pickupLocation}</span>
+                        <ArrowRight size={12} color="var(--text-muted)" />
+                        <span>{deal.deliveryLocation}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="status-badge status-transit" style={{ padding: '4px 10px', fontSize: '12px' }}>Kutilmoqda</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {expectedDeals.length === 0 && (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    Kutilayotgan yuklar yo'q.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <AnimatePresence>
         {selectedWH && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -357,7 +400,7 @@ const StorageModule = () => {
             }}
             onClick={() => setSelectedWH(null)}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -365,13 +408,13 @@ const StorageModule = () => {
               style={{ width: '600px', maxWidth: '90vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
               onClick={e => e.stopPropagation()}
             >
-              <button 
+              <button
                 onClick={() => setSelectedWH(null)}
                 style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               >
                 <XCircle size={24} />
               </button>
-              
+
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                   <h2 style={{ fontSize: '24px', margin: 0 }}>{selectedWH.name}</h2>
@@ -394,9 +437,6 @@ const StorageModule = () => {
                     <User size={16} /> Management
                   </h3>
                   <div style={{ fontWeight: 500, marginBottom: '4px' }}>{selectedWH.manager}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Phone size={14} /> {selectedWH.contact}
-                  </div>
                 </div>
               </div>
 
@@ -416,11 +456,11 @@ const StorageModule = () => {
                   <span>Available Space</span>
                   <span style={{ fontWeight: 600, color: '#34d399' }}>{selectedWH.availableSpace.toLocaleString()} sq ft</span>
                 </div>
-                
+
                 <div className="progress-container">
-                  <div 
-                    className="progress-bar" 
-                    style={{ 
+                  <div
+                    className="progress-bar"
+                    style={{
                       width: `${(selectedWH.occupiedSpace / selectedWH.capacity) * 100}%`,
                       backgroundColor: selectedWH.occupiedSpace === selectedWH.capacity ? '#f87171' : 'var(--text-main)'
                     }}
@@ -432,159 +472,8 @@ const StorageModule = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                <button className="btn" style={{ marginRight: 'auto', color: '#f87171', borderColor: 'rgba(248, 113, 113, 0.3)' }} onClick={() => handleDelete(selectedWH.id)}>
-                  <Trash2 size={16} /> Delete
-                </button>
                 <button className="btn" onClick={() => setSelectedWH(null)}>Close</button>
-                <button className="btn btn-primary" onClick={() => { 
-                  setEditingWH(selectedWH); 
-                  setSelectedFormStatus(selectedWH.status);
-                  setSelectedWH(null); 
-                  setIsFormOpen(true); 
-                }}>
-                  <Edit2 size={16} /> Edit Storage
-                </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {isFormOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="deal-modal-overlay"
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
-            onClick={() => setIsFormOpen(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="deal-modal-content panel"
-              style={{ width: '600px', maxWidth: '90vw', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}
-              onClick={e => e.stopPropagation()}
-            >
-              <button onClick={() => setIsFormOpen(false)} style={{ position: 'absolute', top: '24px', right: '24px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <XCircle size={24} />
-              </button>
-              
-              <div style={{ marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '24px', margin: 0, marginBottom: '8px' }}>{editingWH ? 'Edit Storage' : 'Create New Storage'}</h2>
-                <div style={{ color: 'var(--text-muted)' }}>{editingWH ? 'Update warehouse details below.' : 'Add a new warehouse to your network.'}</div>
-              </div>
-
-              <form onSubmit={handleSave}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Warehouse Name</label>
-                    <input type="text" name="name" defaultValue={editingWH?.name || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Location</label>
-                    <input type="text" name="location" defaultValue={editingWH?.location || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Storage Type</label>
-                    <input type="text" name="type" defaultValue={editingWH?.type || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Status</label>
-                    <div style={{ position: 'relative' }}>
-                      <input type="hidden" name="status" value={selectedFormStatus} />
-                      <div 
-                        onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                        style={{ 
-                          width: '100%', padding: '10px', borderRadius: '8px', 
-                          border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', 
-                          color: 'var(--text-main)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                        }}
-                      >
-                        {selectedFormStatus}
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: statusDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}><polyline points="6 9 12 15 18 9"></polyline></svg>
-                      </div>
-                      <AnimatePresence>
-                        {statusDropdownOpen && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            style={{
-                              position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '4px',
-                              backgroundColor: 'var(--bg-card)', border: '1px solid var(--border)',
-                              borderRadius: '8px', overflow: 'hidden', zIndex: 50,
-                              boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                            }}
-                          >
-                            {['Active', 'Full', 'Maintenance', 'Inactive'].map(s => (
-                              <div 
-                                key={s}
-                                onClick={() => { setSelectedFormStatus(s); setStatusDropdownOpen(false); }}
-                                style={{
-                                  padding: '10px 12px', cursor: 'pointer',
-                                  backgroundColor: selectedFormStatus === s ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                                  color: 'var(--text-main)', fontSize: '14px',
-                                  transition: 'background-color 0.2s'
-                                }}
-                                onMouseEnter={(e) => { if(selectedFormStatus !== s) e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.05)' }}
-                                onMouseLeave={(e) => { if(selectedFormStatus !== s) e.target.style.backgroundColor = 'transparent' }}
-                              >
-                                {s}
-                              </div>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Total Capacity (sq ft)</label>
-                    <input type="number" name="capacity" defaultValue={editingWH?.capacity || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Occupied Space (sq ft)</label>
-                    <input type="number" name="occupiedSpace" defaultValue={editingWH?.occupiedSpace || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Manager Name</label>
-                    <input type="text" name="manager" defaultValue={editingWH?.manager || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Contact Number</label>
-                    <input type="text" name="contact" defaultValue={editingWH?.contact || ''} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-main)' }} required />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', marginTop: '32px', justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn" onClick={() => setIsFormOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={isLoading}>
-                    {editingWH ? 'Update Storage' : 'Create Storage'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
-          >
-            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} style={{ color: 'var(--text-main)' }}>
-              <Loader2 size={48} />
             </motion.div>
           </motion.div>
         )}
