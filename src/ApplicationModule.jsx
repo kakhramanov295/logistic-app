@@ -1,40 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Plus, CheckCircle2, Clock, MapPin, Tag, Hash, PackageOpen, X, FileText, Trash2, ArrowRight, CircleDollarSign, Pencil
+  Plus, CheckCircle2, Clock, MapPin, Tag, Hash, PackageOpen, X, FileText, Trash2, ArrowRight, CircleDollarSign, Pencil, Loader2
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const ApplicationModule = () => {
-  const [orders, setOrders] = useState([
-    {
-      id: 'ORD-2024-001',
-      type: 'Express',
-      contents: 'High-end Electronics',
-      quantity: 50,
-      quantity: 50,
-      weight: '120 lbs',
-      origin: 'New York, NY',
-      destination: 'Los Angeles, CA',
-      value: '$45,000',
-      status: 'Pending',
-      date: '2024-05-18',
-      description: 'Fragile screens, handle with care during transport.'
-    },
-    {
-      id: 'ORD-2024-002',
-      type: 'Fragile',
-      contents: 'Medical Equipment',
-      quantity: 12,
-      quantity: 12,
-      weight: '45 lbs',
-      origin: 'Chicago, IL',
-      destination: 'Houston, TX',
-      value: '$120,000',
-      status: 'Accepted',
-      date: '2024-05-16',
-      description: 'Requires temperature controlled storage.'
-    }
-  ]);
+  const [orders, setOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, actionType: null, orderId: null });
@@ -50,39 +24,95 @@ const ApplicationModule = () => {
     description: ''
   });
 
-  const handleAddOrder = (e) => {
+  // Fetch orders from Supabase on mount
+  const fetchOrders = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('applications')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching orders:', error);
+    } else {
+      setOrders(data || []);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  // Create order in Supabase
+  const handleAddOrder = async (e) => {
     e.preventDefault();
-    const newId = `ORD-2024-${String(orders.length + 1).padStart(3, '0')}`;
+    setIsSaving(true);
     const orderToAdd = {
-      ...newOrder,
-      id: newId,
+      type: newOrder.type,
+      contents: newOrder.contents,
+      quantity: Number(newOrder.quantity),
+      weight: newOrder.weight,
+      origin: newOrder.origin,
+      destination: newOrder.destination,
+      value: newOrder.value,
+      description: newOrder.description,
       status: 'Pending',
       date: new Date().toISOString().split('T')[0]
     };
-    setOrders([orderToAdd, ...orders]);
-    setIsModalOpen(false);
-    setNewOrder({ type: 'Standard', contents: '', quantity: '', weight: '', origin: '', destination: '', value: '', description: '' });
+
+    const { error } = await supabase.from('applications').insert([orderToAdd]);
+    if (error) {
+      console.error('Error creating order:', error);
+    } else {
+      await fetchOrders();
+      setIsModalOpen(false);
+      setNewOrder({ type: 'Standard', contents: '', quantity: '', weight: '', origin: '', destination: '', value: '', description: '' });
+    }
+    setIsSaving(false);
   };
 
   const openEditModal = (order) => {
     setEditModal({ isOpen: true, order: { ...order } });
   };
 
-  const handleEditOrder = (e) => {
+  // Update order in Supabase
+  const handleEditOrder = async (e) => {
     e.preventDefault();
-    setOrders(orders.map(o => o.id === editModal.order.id ? { ...editModal.order } : o));
-    setEditModal({ isOpen: false, order: null });
+    setIsSaving(true);
+    const { id, created_at, ...updateData } = editModal.order;
+
+    const { error } = await supabase
+      .from('applications')
+      .update(updateData)
+      .eq('id', id);
+    if (error) {
+      console.error('Error updating order:', error);
+    } else {
+      await fetchOrders();
+      setEditModal({ isOpen: false, order: null });
+    }
+    setIsSaving(false);
   };
 
-  const confirmAction = () => {
+  // Accept or delete order in Supabase
+  const confirmAction = async () => {
+    setIsSaving(true);
     if (confirmModal.actionType === 'accept') {
-      setOrders(orders.map(order => 
-        order.id === confirmModal.orderId ? { ...order, status: 'Accepted' } : order
-      ));
+      const { error } = await supabase
+        .from('applications')
+        .update({ status: 'Accepted' })
+        .eq('id', confirmModal.orderId);
+      if (error) console.error('Error accepting order:', error);
     } else if (confirmModal.actionType === 'delete') {
-      setOrders(orders.filter(order => order.id !== confirmModal.orderId));
+      const { error } = await supabase
+        .from('applications')
+        .delete()
+        .eq('id', confirmModal.orderId);
+      if (error) console.error('Error deleting order:', error);
     }
+    await fetchOrders();
     setConfirmModal({ isOpen: false, actionType: null, orderId: null });
+    setIsSaving(false);
   };
 
   const getStatusBadge = (status) => {
@@ -129,95 +159,117 @@ const ApplicationModule = () => {
         </div>
       </div>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="order-grid"
-        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-      >
-        {orders.map((order, index) => (
-          <motion.div 
-            key={order.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 * index }}
-            className="panel order-card"
-            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', width: '100%' }}>
-              <div className="order-info" style={{ display: 'flex', gap: '24px', flex: 1, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>Order ID</div>
-                  <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Hash size={16} style={{ color: 'var(--text-muted)' }} /> {order.id}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>Route</div>
-                  <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <MapPin size={16} style={{ color: 'var(--text-muted)' }} /> {order.origin || 'N/A'} <ArrowRight size={14} style={{ color: 'var(--text-muted)', margin: '0 4px' }} /> {order.destination || 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>Contents</div>
-                  <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <PackageOpen size={16} style={{ color: 'var(--text-muted)' }} /> {order.contents}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>Est. Value</div>
-                  <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CircleDollarSign size={16} style={{ color: 'var(--text-muted)' }} /> {order.value || 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>Status</div>
-                  <div>{getStatusBadge(order.status)}</div>
-                </div>
-              </div>
-              <div className="order-actions" style={{ display: 'flex', gap: '12px', minWidth: '160px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                {order.status === 'Pending' ? (
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={() => setConfirmModal({ isOpen: true, actionType: 'accept', orderId: order.id })}
-                    style={{ backgroundColor: 'var(--text-main)', color: 'var(--bg-dark)' }}
-                  >
-                    <CheckCircle2 size={16} /> Accept
-                  </button>
-                ) : (
-                  <div style={{ color: 'var(--text-muted)', fontSize: '14px', fontStyle: 'italic', marginRight: 'auto' }}>
-                    Processed
-                  </div>
-                )}
-                <button 
-                  className="btn" 
-                  onClick={() => openEditModal(order)}
-                  style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--text-main)', padding: '10px' }}
-                  title="Edit Order"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button 
-                  className="btn" 
-                  onClick={() => setConfirmModal({ isOpen: true, actionType: 'delete', orderId: order.id })}
-                  style={{ borderColor: 'rgba(255, 77, 79, 0.3)', color: '#ff4d4f', padding: '10px' }}
-                  title="Delete Order"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-            {order.description && (
-              <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px', lineHeight: '1.5' }}>
-                <span style={{ fontWeight: 500, color: 'var(--text-main)', marginRight: '6px' }}>Description:</span>
-                {order.description}
-              </div>
-            )}
-          </motion.div>
-        ))}
-      </motion.div>
+      {/* Loading State */}
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+          <Loader2 size={24} style={{ animation: 'spin 1s linear infinite' }} />
+          <span style={{ marginLeft: '12px', fontSize: '14px' }}>Loading orders...</span>
+        </div>
+      ) : orders.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+          <PackageOpen size={48} style={{ marginBottom: '16px', opacity: 0.4 }} />
+          <p style={{ fontSize: '16px', fontWeight: 500 }}>No orders yet</p>
+          <p style={{ fontSize: '13px' }}>Click "New Order" to create your first application.</p>
+        </div>
+      ) : (
+        <div className="panel" style={{ padding: '20px' }}>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order Info</th>
+                  <th>Route (Origin ➔ Destination)</th>
+                  <th>Cargo Details</th>
+                  <th>Est. Value</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <React.Fragment key={order.id}>
+                    <tr>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{order.id}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{order.date}</div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                          <span style={{ fontWeight: 500 }}>{order.origin || 'N/A'}</span>
+                          <ArrowRight size={12} style={{ color: 'var(--text-muted)' }} />
+                          <span style={{ fontWeight: 500 }}>{order.destination || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <PackageOpen size={14} style={{ color: 'var(--text-muted)' }} /> {order.contents}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Type: {order.type} | Qty: {order.quantity} {order.weight ? `| Wt: ${order.weight}` : ''}
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>
+                        {order.value ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                             <CircleDollarSign size={14} style={{ color: 'var(--text-muted)' }} /> {order.value}
+                          </div>
+                        ) : 'N/A'}
+                      </td>
+                      <td>{getStatusBadge(order.status)}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {order.status === 'Pending' ? (
+                            <button 
+                              className="btn btn-primary" 
+                              onClick={() => setConfirmModal({ isOpen: true, actionType: 'accept', orderId: order.id })}
+                              style={{ padding: '6px 10px', fontSize: '12px', backgroundColor: 'var(--text-main)', color: 'var(--bg-dark)' }}
+                              title="Accept Order"
+                            >
+                              <CheckCircle2 size={14} style={{ marginRight: '4px' }} /> Accept
+                            </button>
+                          ) : (
+                            <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic', marginRight: 'auto' }}>
+                              Processed
+                            </div>
+                          )}
+                          <button 
+                            className="btn" 
+                            onClick={() => openEditModal(order)}
+                            style={{ padding: '6px' }}
+                            title="Edit Order"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button 
+                            className="btn" 
+                            onClick={() => setConfirmModal({ isOpen: true, actionType: 'delete', orderId: order.id })}
+                            style={{ padding: '6px', color: '#ff4d4f', borderColor: 'rgba(255, 77, 79, 0.3)' }}
+                            title="Delete Order"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {order.description && (
+                      <tr>
+                        <td colSpan="6" style={{ padding: '8px 16px 16px 16px', borderTop: 'none' }}>
+                          <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px', color: 'var(--text-muted)', fontSize: '13px', lineHeight: '1.5' }}>
+                            <span style={{ fontWeight: 500, color: 'var(--text-main)', marginRight: '6px' }}>Description:</span>
+                            {order.description}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
+      {/* Create Order Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <motion.div 
@@ -343,7 +395,9 @@ const ApplicationModule = () => {
 
                 <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
                   <button type="button" className="btn" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">Create Order</button>
+                  <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                    {isSaving ? 'Creating...' : 'Create Order'}
+                  </button>
                 </div>
               </form>
             </motion.div>
@@ -470,7 +524,9 @@ const ApplicationModule = () => {
 
                 <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
                   <button type="button" className="btn" onClick={() => setEditModal({ isOpen: false, order: null })}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">Save Changes</button>
+                  <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
                 </div>
               </form>
             </motion.div>
@@ -478,6 +534,7 @@ const ApplicationModule = () => {
         )}
       </AnimatePresence>
 
+      {/* Confirm Modal */}
       <AnimatePresence>
         {confirmModal.isOpen && (
           <motion.div 
@@ -510,8 +567,9 @@ const ApplicationModule = () => {
                   className="btn btn-primary"
                   style={confirmModal.actionType === 'delete' ? { backgroundColor: '#ff4d4f', color: '#fff' } : {}}
                   onClick={confirmAction}
+                  disabled={isSaving}
                 >
-                  Confirm
+                  {isSaving ? 'Processing...' : 'Confirm'}
                 </button>
               </div>
             </motion.div>
