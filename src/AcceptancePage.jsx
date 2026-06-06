@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   PackageCheck, Search, Eye, X, Download,
@@ -8,6 +8,7 @@ import {
   ClipboardList, Camera, ShieldCheck, BarChart3,
   ExternalLink, Layers
 } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
 const statusConfig = {
   accepted:   { label: 'Accepted',      color: '#f5f5f5', bg: 'rgba(255,255,255,0.12)',  icon: CheckCircle },
@@ -24,22 +25,6 @@ const conditionConfig = {
 
 const modeIcon = { road: Truck, sea: Ship, air: Plane, courier: Package };
 
-const cargos = [
-  { id: 'AC-2024-001', ref: 'SH-2024-001', carrier: 'FastFreight LLC',  sender: 'Acme Corp',       origin: 'New York, NY',  weight: '2,400 kg', dims: '120×80×90 cm', pieces: 12, temp: 'Ambient',  arrival: 'May 14, 09:00', mode: 'road',    status: 'accepted',   condition: 'good',    inspector: 'J. Williams', notes: '', orderValue: 600000, spendings: [{ label: 'Customs Duty', amount: 120000 }, { label: 'Transport Fee', amount: 50000 }, { label: 'Handling', amount: 30000 }] },
-  { id: 'AC-2024-002', ref: 'SH-2024-002', carrier: 'SkyMove Air',      sender: 'Euro Supplies',   origin: 'Hamburg, DE',   weight: '380 kg',   dims: '60×40×50 cm',  pieces: 4,  temp: 'Chilled',  arrival: 'May 15, 14:30', mode: 'air',     status: 'pending',    condition: 'good',    inspector: 'Unassigned', notes: '', orderValue: 120000, spendings: [{ label: 'Air Freight', amount: 18000 }, { label: 'Import Duty', amount: 9000 }] },
-  { id: 'AC-2024-003', ref: 'SH-2024-003', carrier: 'OceanPrime',       sender: 'Pacific Goods',   origin: 'Tokyo, JP',     weight: '8,700 kg', dims: '240×120×200',  pieces: 34, temp: 'Ambient',  arrival: 'May 16, 08:15', mode: 'sea',     status: 'inspection', condition: 'partial', inspector: 'M. Torres',  notes: '3 pallets show moisture damage', orderValue: 850000, spendings: [{ label: 'Sea Freight', amount: 60000 }, { label: 'Customs', amount: 42000 }, { label: 'Damage Inspection', amount: 15000 }] },
-  { id: 'AC-2024-004', ref: 'SH-2024-004', carrier: 'BorderXpress',     sender: 'Mex Exports',     origin: 'Mexico City',   weight: '1,100 kg', dims: '100×60×80 cm', pieces: 8,  temp: 'Frozen',   arrival: 'May 17, 11:00', mode: 'road',    status: 'rejected',   condition: 'damaged', inspector: 'S. Patel',   notes: 'Packaging integrity compromised, temperature breach', orderValue: 95000, spendings: [{ label: 'Import Duty', amount: 7800 }, { label: 'Cold Chain Fee', amount: 12000 }] },
-  { id: 'AC-2024-005', ref: 'SH-2024-005', carrier: 'QuickCourier',     sender: 'UK Premium',      origin: 'London, UK',    weight: '95 kg',    dims: '45×30×30 cm',  pieces: 3,  temp: 'Ambient',  arrival: 'May 18, 16:45', mode: 'courier', status: 'accepted',   condition: 'good',    inspector: 'J. Williams', notes: '', orderValue: 31500, spendings: [{ label: 'Courier Fee', amount: 2800 }, { label: 'VAT', amount: 1900 }] },
-  { id: 'AC-2024-006', ref: 'SH-2024-006', carrier: 'MarineRoute',      sender: 'AsiaTech',        origin: 'Seoul, KR',     weight: '5,200 kg', dims: '200×100×150',  pieces: 22, temp: 'Ambient',  arrival: 'May 19, 07:30', mode: 'sea',     status: 'pending',    condition: 'good',    inspector: 'Unassigned', notes: '', orderValue: 320000, spendings: [{ label: 'Sea Freight', amount: 28000 }, { label: 'Port Handling', amount: 14000 }, { label: 'Customs', amount: 19000 }] },
-];
-
-const stats = [
-  { label: 'Total Receipts',   value: '74',  sub: 'This month',       icon: PackageCheck,  color: '#f5f5f5' },
-  { label: 'Accepted',         value: '55',  sub: '74% acceptance',   icon: CheckCircle,   color: '#f5f5f5' },
-  { label: 'Under Inspection', value: '10',  sub: 'Awaiting verdict', icon: AlertTriangle, color: '#f5f5f5' },
-  { label: 'Rejected',         value: '9',   sub: 'Returned/held',    icon: XCircle,       color: '#f5f5f5' },
-];
-
 const checklist = [
   'Quantity matches AWB/BOL',
   'External packaging intact',
@@ -51,16 +36,31 @@ const checklist = [
   'Delivery documents signed',
 ];
 
-const InspectionModal = ({ record, onClose }) => {
+const getStats = (items) => {
+  const total = items.length;
+  const accepted = items.filter(d => d.status === 'accepted').length;
+  const inspection = items.filter(d => d.status === 'inspection').length;
+  const rejected = items.filter(d => d.status === 'rejected').length;
+  return [
+    { label: 'Total Receipts',   value: total.toString(),  sub: 'Overall volume',       icon: PackageCheck,  color: '#f5f5f5' },
+    { label: 'Accepted',         value: accepted.toString(),  sub: `${total ? Math.round((accepted/total)*100) : 0}% acceptance`,   icon: CheckCircle,   color: '#f5f5f5' },
+    { label: 'Under Inspection', value: inspection.toString(),  sub: 'Awaiting verdict', icon: AlertTriangle, color: '#f5f5f5' },
+    { label: 'Rejected',         value: rejected.toString(),   sub: 'Returned/held',    icon: XCircle,       color: '#f5f5f5' },
+  ];
+};
+
+const InspectionModal = ({ record, onClose, onUpdate }) => {
   const [checks, setChecks] = useState(Array(checklist.length).fill(false));
-  const [note, setNote] = useState(record.notes);
+  const [note, setNote] = useState(record.notes || '');
   const [spendings, setSpendings] = useState(record.spendings || []);
   const [newLabel, setNewLabel] = useState('');
   const [newAmount, setNewAmount] = useState('');
-  const cfg = statusConfig[record.status];
-  const condCfg = conditionConfig[record.condition];
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const cfg = statusConfig[record.status] || statusConfig['pending'];
+  const condCfg = conditionConfig[record.condition] || conditionConfig['good'];
   const StatusIcon = cfg.icon;
-  const ModeIcon = modeIcon[record.mode];
+  const ModeIcon = modeIcon[record.mode] || Truck;
   const allChecked = checks.every(Boolean);
 
   const totalSpendings = spendings.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
@@ -77,6 +77,27 @@ const InspectionModal = ({ record, onClose }) => {
   };
 
   const removeSpending = (idx) => setSpendings(prev => prev.filter((_, i) => i !== idx));
+
+  const handleUpdateStatus = async (newStatus) => {
+    setIsProcessing(true);
+    const { error } = await supabase
+      .from('cargos')
+      .update({
+        status: newStatus,
+        notes: note,
+        spendings: spendings
+      })
+      .eq('id', record.id);
+    
+    if (!error) {
+      onUpdate({ ...record, status: newStatus, notes: note, spendings: spendings });
+      onClose();
+    } else {
+      console.error('Error updating cargo status:', error);
+      alert('Error updating in database');
+    }
+    setIsProcessing(false);
+  };
 
   return (
     <motion.div
@@ -214,15 +235,23 @@ const InspectionModal = ({ record, onClose }) => {
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
-          <button style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
-            Reject Cargo
+          <button 
+            onClick={() => handleUpdateStatus('rejected')}
+            disabled={isProcessing}
+            style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+            {isProcessing ? 'Saving...' : 'Reject Cargo'}
           </button>
-          <button style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
-            Flag for Inspection
+          <button 
+            onClick={() => handleUpdateStatus('inspection')}
+            disabled={isProcessing}
+            style={{ flex: 1, padding: '12px 0', borderRadius: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', color: '#f5f5f5', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}>
+            {isProcessing ? 'Saving...' : 'Flag for Inspection'}
           </button>
           <button
+            onClick={() => { if (allChecked) handleUpdateStatus('accepted'); }}
+            disabled={isProcessing || !allChecked}
             style={{ flex: 1.5, padding: '12px 0', borderRadius: 10, background: allChecked ? '#f5f5f5' : 'rgba(255,255,255,0.05)', border: '1px solid', borderColor: allChecked ? '#f5f5f5' : 'rgba(255,255,255,0.1)', color: allChecked ? '#0a0a0a' : '#555', fontWeight: 700, cursor: allChecked ? 'pointer' : 'default', fontSize: 14, transition: 'all 0.3s' }}>
-            {allChecked ? '✓ Confirm Acceptance' : `Complete checklist (${checks.filter(Boolean).length}/{checklist.length})`}
+            {allChecked ? (isProcessing ? 'Saving...' : '✓ Confirm Acceptance') : `Complete checklist (${checks.filter(Boolean).length}/${checklist.length})`}
           </button>
         </div>
       </motion.div>
@@ -289,9 +318,28 @@ const NewReceiptModal = ({ onClose }) => {
 };
 
 const AcceptancePage = () => {
+  const [cargos, setCargos] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetchCargos();
+  }, []);
+
+  const fetchCargos = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('cargos').select('*');
+    if (!error && data) {
+      setCargos(data);
+    } else {
+      console.error('Error fetching cargos:', error);
+    }
+    setIsLoading(false);
+  };
+
+  const dynamicStats = getStats(cargos);
 
   const filtered = cargos.filter(c => {
     const matchSearch = !search || c.id.toLowerCase().includes(search.toLowerCase()) || c.carrier.toLowerCase().includes(search.toLowerCase()) || c.sender.toLowerCase().includes(search.toLowerCase());
@@ -299,9 +347,15 @@ const AcceptancePage = () => {
     return matchSearch && matchStatus;
   });
 
+  const handleUpdateRecord = (updatedRecord) => {
+    setCargos(cargos.map(c => c.id === updatedRecord.id ? updatedRecord : c));
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} className="main-content">
-      <AnimatePresence>{selected && <InspectionModal record={selected} onClose={() => setSelected(null)} />}</AnimatePresence>
+      <AnimatePresence>
+        {selected && <InspectionModal record={selected} onClose={() => setSelected(null)} onUpdate={handleUpdateRecord} />}
+      </AnimatePresence>
 
       {/* Header */}
       <div className="header">
@@ -310,13 +364,15 @@ const AcceptancePage = () => {
           <p className="page-subtitle">Receive, inspect and accept incoming cargo shipments</p>
         </div>
         <div className="header-actions">
-          <button className="btn"><Download size={16} /> Export</button>
+          <button className="btn" onClick={fetchCargos} disabled={isLoading}>
+            {isLoading ? 'Syncing...' : <><Download size={16} /> Sync</>}
+          </button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginBottom: 28 }}>
-        {stats.map((s, i) => {
+        {dynamicStats.map((s, i) => {
           const Icon = s.icon;
           return (
             <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} className="stat-card">
@@ -364,10 +420,10 @@ const AcceptancePage = () => {
         }}
       >
         {filtered.map((c, i) => {
-          const cfg = statusConfig[c.status];
-          const condCfg = conditionConfig[c.condition];
+          const cfg = statusConfig[c.status] || statusConfig['pending'];
+          const condCfg = conditionConfig[c.condition] || conditionConfig['good'];
           const StatusIcon = cfg.icon;
-          const ModeIcon = modeIcon[c.mode];
+          const ModeIcon = modeIcon[c.mode] || Truck;
           return (
             <motion.div
               layout
