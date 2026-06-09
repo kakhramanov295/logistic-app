@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, Eye, Edit2, Trash2, X, FileText,
-  Phone, MapPin, Calendar, DollarSign, Briefcase, Archive, AlertTriangle, Truck, Clock, CheckCircle2, XCircle, Handshake
+  Phone, MapPin, Calendar, DollarSign, Briefcase, Archive, AlertTriangle, Truck, Clock, CheckCircle2, XCircle, Handshake, ChevronDown, Package
 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
@@ -42,6 +42,9 @@ const DealModule = () => {
   const [editDeal, setEditDeal] = useState(null);
   const [dealToDelete, setDealToDelete] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [acceptedApplications, setAcceptedApplications] = useState([]);
+  const [isCargoSelectOpen, setIsCargoSelectOpen] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState('');
   
   const [formData, setFormData] = useState({
     title: '',
@@ -60,13 +63,27 @@ const DealModule = () => {
 
   React.useEffect(() => {
     fetchDeals();
+    fetchAcceptedApplications();
   }, []);
+
+  const fetchAcceptedApplications = async () => {
+    const { data, error } = await supabase
+      .from('applications')
+      .select('*')
+      .eq('status', 'Accepted');
+    if (error) {
+      console.error('Error fetching accepted applications:', error);
+    } else {
+      setAcceptedApplications(data || []);
+    }
+  };
 
   const fetchDeals = async () => {
     setIsLoading(true);
     const { data, error } = await supabase.from('deals').select('*');
     if (error) {
       console.error('Error fetching deals:', error);
+      alert('Ошибка при загрузке сделок: ' + error.message + '\n\nПроверьте, существует ли таблица "deals" в Supabase и все ли колонки совпадают.');
     } else {
       setDeals(data || []);
     }
@@ -74,11 +91,18 @@ const DealModule = () => {
   };
 
   const filteredDeals = deals.filter(deal => {
-    const matchesSearch = deal.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          deal.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          deal.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          deal.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          deal.deliveryLocation.toLowerCase().includes(searchTerm.toLowerCase());
+    const s = (searchTerm || '').toLowerCase();
+    const title = (deal.title || '').toLowerCase();
+    const custName = (deal.customerName || '').toLowerCase();
+    const id = (deal.id || '').toLowerCase();
+    const pickup = (deal.pickupLocation || '').toLowerCase();
+    const delivery = (deal.deliveryLocation || '').toLowerCase();
+    
+    const matchesSearch = title.includes(s) || 
+                          custName.includes(s) ||
+                          id.includes(s) ||
+                          pickup.includes(s) ||
+                          delivery.includes(s);
     const matchesStatus = filterStatus === 'All' || deal.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -92,6 +116,8 @@ const DealModule = () => {
   // Form opening and reset
   const handleOpenCreateModal = () => {
     setEditDeal(null);
+    setSelectedAppId('');
+    setIsCargoSelectOpen(false);
     setFormData({
       title: '',
       customerName: '',
@@ -104,7 +130,8 @@ const DealModule = () => {
       price: '',
       pickupDate: '',
       deliveryDate: '',
-      notes: ''
+      notes: '',
+      paymentMethod: 'Cash'
     });
     setIsFormOpen(true);
   };
@@ -148,7 +175,8 @@ const DealModule = () => {
           price: price,
           pickupDate: formData.pickupDate,
           deliveryDate: formData.deliveryDate,
-          notes: formData.notes
+          notes: formData.notes,
+          paymentMethod: formData.paymentMethod || 'Cash'
         })
         .eq('id', editDeal.id);
         
@@ -172,15 +200,20 @@ const DealModule = () => {
         deliveryDate: formData.deliveryDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
         status: 'New',
         notes: formData.notes,
-        driverInfo: 'Pending'
+        driverInfo: 'Pending',
+        paymentMethod: formData.paymentMethod || 'Cash'
       };
       
       const { error } = await supabase
         .from('deals')
         .insert([newDeal]);
         
-      if (error) console.error('Error creating deal:', error);
-      else await fetchDeals();
+      if (error) {
+        console.error('Error creating deal:', error);
+        alert('Ошибка при создании сделки: ' + error.message + '\n\nУбедитесь, что таблица "deals" существует в Supabase и имеет все необходимые колонки (title, customerName, pickupLocation и т.д.).');
+      } else {
+        await fetchDeals();
+      }
     }
     
     setIsFormOpen(false);
@@ -454,10 +487,23 @@ const DealModule = () => {
                   </div>
                   <div>
                     <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <DollarSign size={12} /> Price / Valuation
+                      <DollarSign size={12} /> Price / Payment
                     </h3>
                     <div style={{ fontSize: '18px', fontWeight: 700 }}>
                       ${Number(viewDeal.price || 0).toLocaleString()}
+                    </div>
+                    <div style={{ marginTop: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                      Payment Method: <span style={{
+                        fontWeight: 600,
+                        color: 'var(--text-main)',
+                        background: 'rgba(255,255,255,0.06)',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        fontSize: '12px'
+                      }}>
+                        {viewDeal.paymentMethod || 'Cash'}
+                        {viewDeal.paymentMethod === 'Valuta' && ' (5% fee applies)'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -574,6 +620,109 @@ const DealModule = () => {
               </button>
 
               <form onSubmit={handleFormSubmit}>
+                {!editDeal && (
+                  <div style={{ marginBottom: '24px', position: 'relative' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Select Accepted Cargo (Optional)
+                    </label>
+                    <div 
+                      onClick={() => setIsCargoSelectOpen(!isCargoSelectOpen)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        width: '100%', padding: '12px 16px', borderRadius: '10px', 
+                        border: `1px solid ${isCargoSelectOpen ? 'rgba(255,255,255,0.2)' : 'var(--border)'}`,
+                        backgroundColor: 'rgba(255, 255, 255, 0.03)', color: selectedAppId ? 'var(--text-main)' : 'var(--text-muted)', 
+                        cursor: 'pointer', transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Package size={18} style={{ color: selectedAppId ? 'var(--text-main)' : 'var(--text-muted)' }} />
+                        <span style={{ fontSize: '14px', fontWeight: selectedAppId ? 500 : 400 }}>
+                          {selectedAppId 
+                            ? (() => {
+                                const app = acceptedApplications.find(a => a.id == selectedAppId);
+                                return app ? `#${app.id} — ${app.contents} (${app.origin} → ${app.destination})` : 'Select Cargo...';
+                              })()
+                            : 'Select Cargo...'}
+                        </span>
+                      </div>
+                      <ChevronDown size={16} style={{ transform: isCargoSelectOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s ease', color: 'var(--text-muted)' }} />
+                    </div>
+
+                    <AnimatePresence>
+                      {isCargoSelectOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.2 }}
+                          style={{
+                            position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0,
+                            backgroundColor: '#1a1a1a', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)',
+                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                            zIndex: 10, maxHeight: '220px', overflowY: 'auto'
+                          }}
+                        >
+                          <div 
+                            onClick={() => {
+                              setSelectedAppId('');
+                              setIsCargoSelectOpen(false);
+                            }}
+                            style={{
+                              padding: '12px 16px', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '14px',
+                              borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            -- Custom Deal (No Cargo Selected) --
+                          </div>
+                          {acceptedApplications.map(app => (
+                            <div
+                              key={app.id}
+                              onClick={() => {
+                                setSelectedAppId(app.id);
+                                setIsCargoSelectOpen(false);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  title: `Deal for ${app.contents}`,
+                                  pickupLocation: app.origin || prev.pickupLocation,
+                                  deliveryLocation: app.destination || prev.deliveryLocation,
+                                  cargoType: app.contents || prev.cargoType,
+                                  orderedQuantity: app.quantity || prev.orderedQuantity,
+                                  price: app.value || prev.price,
+                                  notes: app.description || prev.notes
+                                }));
+                              }}
+                              style={{
+                                padding: '12px 16px', cursor: 'pointer', transition: 'background 0.2s',
+                                display: 'flex', flexDirection: 'column', gap: '4px',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                backgroundColor: selectedAppId == app.id ? 'rgba(255,255,255,0.08)' : 'transparent'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = selectedAppId == app.id ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)'}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = selectedAppId == app.id ? 'rgba(255,255,255,0.08)' : 'transparent'}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '14px' }}>{app.contents}</span>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>#{app.id}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                                <MapPin size={12} /> {app.origin} → {app.destination}
+                              </div>
+                            </div>
+                          ))}
+                          {acceptedApplications.length === 0 && (
+                            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                              No accepted applications found.
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
+
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>Deal Title / Description</label>
                   <input
@@ -719,6 +868,42 @@ const DealModule = () => {
                         backgroundColor: 'rgba(255, 255, 255, 0.02)', color: 'var(--text-main)', outline: 'none'
                       }}
                     />
+                  </div>
+
+                  {/* Payment Method */}
+                  <div style={{ marginTop: '16px' }}>
+                    <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Payment Method</h3>
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {['Cash', 'Card', 'Bank', 'Valuta'].map(method => (
+                        <button
+                          key={method}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, paymentMethod: method }))}
+                          style={{
+                            padding: '10px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                            cursor: 'pointer', transition: 'all 0.2s',
+                            border: formData.paymentMethod === method ? '1px solid rgba(255,255,255,0.4)' : '1px solid var(--border)',
+                            backgroundColor: formData.paymentMethod === method ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.02)',
+                            color: formData.paymentMethod === method ? 'var(--text-main)' : 'var(--text-muted)'
+                          }}
+                        >
+                          {method === 'Cash' && '💵 Cash'}
+                          {method === 'Card' && '💳 Card'}
+                          {method === 'Bank' && '🏦 Bank'}
+                          {method === 'Valuta' && '💱 Valuta'}
+                        </button>
+                      ))}
+                    </div>
+                    {(formData.paymentMethod === 'Valuta') && (
+                      <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        ⚠️ Valuta rate: <strong style={{ color: 'var(--text-main)' }}>5% fee</strong> applies — effective amount: <strong style={{ color: 'var(--text-main)' }}>${(Number(formData.price || 0) * 1.05).toFixed(2)}</strong>
+                      </div>
+                    )}
+                    {(formData.paymentMethod === 'Cash' ) && (
+                      <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', fontSize: '13px', color: 'var(--text-muted)' }}>
+                        Cash rate: <strong style={{ color: 'var(--text-main)' }}>290 UZS per $1</strong>
+                      </div>
+                    )}
                   </div>
                 </div>
 
