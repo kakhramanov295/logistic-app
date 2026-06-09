@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  FileText, Search, Download, Eye,
+  FileText, Search, Download, Eye, Plus,
   AlertTriangle, CheckCircle, Clock, XCircle,
   X, Ship, Plane, Truck, Package, Calendar, Hash,
   Globe, User, DollarSign, Tag, FileCheck
@@ -77,6 +77,31 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
     setIsEditing(false);
   };
 
+  const pushToAcceptance = async () => {
+    const newCargoId = `CRG-${local.id.replace('DECL-', '')}`;
+    const { data: existing } = await supabase.from('cargos').select('id').eq('id', newCargoId);
+    if (!existing || existing.length === 0) {
+      const newCargo = {
+        id: newCargoId,
+        ref: local.id,
+        carrier: 'Customs Transit',
+        sender: local.shipper,
+        origin: local.origin,
+        weight: 'TBD',
+        pieces: 'TBD',
+        temp: 'Ambient',
+        mode: local.mode,
+        condition: 'good',
+        status: 'pending',
+        arrival: new Date().toISOString().split('T')[0],
+        orderValue: Number(local.value) || 0,
+        notes: '',
+        spendings: []
+      };
+      await supabase.from('cargos').insert([newCargo]);
+    }
+  };
+
   const handlePayFees = async () => {
     setIsProcessing(true);
     const newDocs = [...local.documents, { name: 'Customs Fee Receipt', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' }];
@@ -90,6 +115,7 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
     if (!error) {
       setDeclarations(declarations.map(d => d.id === local.id ? updatedLocal : d));
       updateLocal(updatedLocal);
+      await pushToAcceptance();
     } else {
       console.error('Error paying fees:', error);
     }
@@ -107,6 +133,9 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
     if (!error) {
       setDeclarations(declarations.map(d => d.id === local.id ? { ...local, status: nextStatus } : d));
       updateLocal({ status: nextStatus });
+      if (nextStatus === 'received') {
+        await pushToAcceptance();
+      }
     } else {
       console.error('Error toggling status:', error);
     }
@@ -375,12 +404,104 @@ const DetailModal = ({ record, onClose, declarations, setDeclarations }) => {
   );
 };
 
+const NewDeclarationModal = ({ onClose, onSuccess }) => {
+  const [form, setForm] = useState({
+    shipper: '', consignee: '', origin: '', port: '', mode: 'sea', value: '', hs: ''
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsProcessing(true);
+    const newId = `DECL-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newDecl = {
+      id: newId,
+      ...form,
+      status: 'waiting',
+      paymentStatus: 'unpaid',
+      date: new Date().toISOString().split('T')[0],
+      documents: [],
+      spendings: '',
+      spendingBreakdown: ''
+    };
+
+    const { error } = await supabase.from('declarations').insert([newDecl]);
+    if (!error) {
+      onSuccess(newDecl);
+      onClose();
+    } else {
+      console.error('Error creating declaration:', error);
+      alert('Failed to create declaration');
+    }
+    setIsProcessing(false);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
+        onClick={e => e.stopPropagation()}
+        style={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 500 }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ fontWeight: 700, fontSize: 18 }}>Incoming from Storage</div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', color: '#888', display: 'flex' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {[
+            { key: 'shipper', label: 'Shipper', placeholder: 'Sender company' },
+            { key: 'consignee', label: 'Consignee', placeholder: 'Receiver/Warehouse' },
+            { key: 'origin', label: 'Origin', placeholder: 'City, Country' },
+            { key: 'port', label: 'Port of Entry', placeholder: 'e.g. Tashkent Airport' },
+            { key: 'value', label: 'Declared Value (USD)', placeholder: 'e.g. 5000', type: 'number' },
+            { key: 'hs', label: 'HS Code', placeholder: 'e.g. 8471.30' }
+          ].map(({ key, label, placeholder, type = 'text' }) => (
+            <div key={key}>
+              <label style={{ display: 'block', color: '#888', fontSize: 12, marginBottom: 6 }}>{label}</label>
+              <input
+                type={type} required value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                placeholder={placeholder}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: '#f5f5f5', fontSize: 14, outline: 'none' }}
+              />
+            </div>
+          ))}
+
+          <div>
+            <label style={{ display: 'block', color: '#888', fontSize: 12, marginBottom: 6 }}>Transport Mode</label>
+            <select
+              value={form.mode} onChange={e => setForm(p => ({ ...p, mode: e.target.value }))}
+              style={{ width: '100%', background: '#111', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: '#f5f5f5', fontSize: 14, outline: 'none' }}
+            >
+              {['sea', 'air', 'road', 'courier'].map(m => <option key={m} value={m}>{m.toUpperCase()}</option>)}
+            </select>
+          </div>
+
+          <button
+            type="submit" disabled={isProcessing}
+            style={{ width: '100%', marginTop: 10, padding: '12px 0', borderRadius: 10, background: '#f5f5f5', border: 'none', color: '#0a0a0a', fontWeight: 700, cursor: 'pointer', fontSize: 15 }}
+          >
+            {isProcessing ? 'Processing...' : 'Register Declaration (Waiting)'}
+          </button>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 /* ─── CustomPage ────────────────────────────────────────────────────────────── */
 const CustomPage = ({ declarations, setDeclarations }) => {
   const [search, setSearch]           = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected]       = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     fetchDeclarations();
@@ -419,6 +540,12 @@ const CustomPage = ({ declarations, setDeclarations }) => {
             setDeclarations={setDeclarations}
           />
         )}
+        {isCreating && (
+          <NewDeclarationModal
+            onClose={() => setIsCreating(false)}
+            onSuccess={(newDecl) => setDeclarations(prev => [newDecl, ...prev])}
+          />
+        )}
       </AnimatePresence>
 
       {/* Header */}
@@ -427,7 +554,10 @@ const CustomPage = ({ declarations, setDeclarations }) => {
           <h1 className="page-title">Customs Clearance</h1>
           <p className="page-subtitle">Manage import/export declarations and clearance status</p>
         </div>
-        <div className="header-actions">
+        <div className="header-actions" style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn" onClick={() => setIsCreating(true)}>
+            <Plus size={16} /> Incoming from Storage
+          </button>
           <button className="btn" onClick={fetchDeclarations} disabled={isLoading}>
             {isLoading ? 'Syncing...' : <><Download size={16} /> Sync</>}
           </button>
